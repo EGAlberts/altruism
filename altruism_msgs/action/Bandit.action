@@ -1,0 +1,5 @@
+string[] parameters
+---
+float32 average_reward
+---
+string chosen_arm
