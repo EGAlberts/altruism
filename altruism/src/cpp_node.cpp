@@ -7,114 +7,159 @@
 #include "behaviortree_ros2/bt_action_node.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "altruism_msgs/action/bandit.hpp"
+#include "altruism_msgs/action/behavior_tree.hpp"
+
+#include "altruism_msgs/srv/set_blackboard.hpp"
+
+#include "altruism/bandit_action_node.h"
+
+
 
 using namespace BT;
+using std::placeholders::_1;
+using std::placeholders::_2;
 
-
-
-
-using Bandit = altruism_msgs::action::Bandit;
-class BanditAction: public RosActionNode<Bandit>
-{
-public:
-  BanditAction(const std::string& name,
-                  const NodeConfig& conf,
-                  const RosNodeParams& params)
-    : RosActionNode<Bandit>(name, conf, params)
-  {}
-
-  // The specific ports of this Derived class
-  // should be merged with the ports of the base class,
-  // using RosActionNode::providedBasicPorts()
-  static PortsList providedPorts()
-  {
-    return providedBasicPorts({InputPort<std::string>("rb_name")});
-  }
-
-  // This is called when the TreeNode is ticked and it should
-  // send the request to the action server
-  bool setGoal(RosActionNode::Goal& goal) override 
-  {
-    //goal->parameters = NULL;
-    // // get "radius" from the Input port
-    // getInput("rb_name", goal.parameters);
-    // return true, if we were able to set the goal correctly.
-    return true;
-  }
-  
-  // Callback executed when the reply is received.
-  // Based on the reply you may decide to return SUCCESS or FAILURE.
-  NodeStatus onResultReceived(const WrappedResult& wr) override
-  {
-    // std::stringstream ss;
-    // ss << "Result received: ";
-    // for (auto number : wr.result) {
-    //   ss << number << " ";
-    // }
-    // RCLCPP_INFO(node_->get_logger(), ss.str().c_str());
-    return NodeStatus::SUCCESS;
-  }
-
-  // Callback invoked when there was an error at the level
-  // of the communication between client and server.
-  // This will set the status of the TreeNode to either SUCCESS or FAILURE,
-  // based on the return value.
-  // If not overridden, it will return FAILURE by default.
-  virtual NodeStatus onFailure(ActionNodeErrorCode error) override
-  {
-    RCLCPP_ERROR(node_->get_logger(), "Error: %d", error);
-    return NodeStatus::FAILURE;
-  }
-
-  // we also support a callback for the feedback, as in
-  // the original tutorial.
-  // Usually, this callback should return RUNNING, but you
-  // might decide, based on the value of the feedback, to abort
-  // the action, and consider the TreeNode completed.
-  // In that case, return SUCCESS or FAILURE.
-  // The Cancel request will be send automatically to the server.
-  NodeStatus onFeedback(const std::shared_ptr<const Feedback> feedback)
-  {
-    std::stringstream ss;
-    ss << "Feedback received: ";
-    // for (auto number : feedback->left_time) {
-    ss << feedback->chosen_arm;
-    // }
-    RCLCPP_INFO(node_->get_logger(), ss.str().c_str());
-    return NodeStatus::RUNNING;
-  }
-};
-
-
-// static const char* xml_text = R"(
-// <root BTCPP_format="4">
-//   <BehaviorTree ID="Untitled">
-//     <Parallel failure_count="1"
-//               success_count="-1">
-//       <NFR property="safety"
-//            weight="1.0">
-//         <Sequence>
-//           <Waiting time="10"/>
-//           <NFR property="cspeed"
-//                weight="1.0">
-//             <DriveForward name="Patrol" time="10"/>
-//           </NFR>
-//         </Sequence>
-//       </NFR>
-//       <Bandit rb_name="fd"/>
-//     </Parallel>
-//   </BehaviorTree>
-// </root>
-// )";
-
-
-static const char* xml_text = R"(
+static const char* half_xml_text = R"(
 <root BTCPP_format="4">
   <BehaviorTree ID="Untitled">
-    <Bandit rb_name="fd"/>
+    <Parallel failure_count="1"
+              success_count="-1">
+      <NFR property="safety"
+           weight="1.0">
+        <Sequence>
+          <NFR property="cspeed"
+               weight="1.0">
+            <SLAM_fd/>
+          </NFR>
+          <NFR property="cspeed, energy"
+               weight="1.0, 5.0">
+            <SearchAndID_fd/>
+          </NFR>
+          <Pass_fd/>
+        </Sequence>
+      </NFR>
+      <Bandit rb_name="dl"/>
+    </Parallel>
   </BehaviorTree>
 </root>
 )";
+
+
+static const char* bandit_xml = R"(
+<root BTCPP_format="4">
+  <BehaviorTree ID="Untitled">
+    <Sequence>
+      <Script code=" the_answer:='SomeText' " />
+      <Bandit rb_name="{the_answer}"/>
+    </Sequence>
+  </BehaviorTree>
+</root>
+)";
+
+static const char* xml_tree = R"(
+<root BTCPP_format="4">
+  <BehaviorTree ID="Untitled">
+    <Sequence>
+      <Bandit rb_name="{the_answer}"/>
+    </Sequence>
+  </BehaviorTree>
+</root>
+)";
+
+static const char* bandit_xml2 = R"(
+<root BTCPP_format="4">
+  <BehaviorTree ID="Untitled">
+    <Sequence>
+      <Bandit rb_name="{the_answer}"/>
+    </Sequence>
+  </BehaviorTree>
+</root>
+)";
+
+
+
+class Arborist : public rclcpp::Node
+{
+public:
+  using SetBlackboard = altruism_msgs::srv::SetBlackboard;
+  using BTAction = altruism_msgs::action::BehaviorTree;
+  using GoalHandleBTAction = rclcpp_action::ServerGoalHandle<BehaviorTreeAction>;
+
+  BT::Tree tree;
+  BehaviorTreeFactory factory;
+
+  Arborist(std::string name = "arborist_node") : Node(name)
+  {
+      _set_blackboard = this->create_service<SetBlackboard>("set_blackboard", std::bind(&Arborist::handle_set_bb, this, _1, _2));
+      //_start_tree = this->create_service<SetBlackboard>("set_blackboard", std::bind(&Arborist::handle_set_bb, this, _1, _2));
+      _start_tree = rclcpp_action::create_server<BTAction>(
+      this,
+      "start_tree",
+      std::bind(&Arborist::handle_tree_goal, this, _1, _2),
+      std::bind(&Arborist::handle_tree_cancel, this, _1),
+      std::bind(&Arborist::handle_tree_accepted, this, _1));\
+
+      registerCustomNode(factory, "bt_bandit_client", "bandit", "Bandit");
+      tree = factory.createTreeFromText(xml_tree);
+  }
+
+  void registerCustomNode(BehaviorTreeFactory& factory, std::string client_name, std::string action_name, std::string name_in_xml)
+  {
+    auto nh = std::make_shared<rclcpp::Node>(client_name);
+
+    RosNodeParams params;
+    params.nh = nh;
+    params.default_port_value = action_name;
+
+    factory.registerNodeType<BanditAction>(name_in_xml, params);
+
+  }
+
+private:
+  void handle_set_bb(const std::shared_ptr<SetBlackboard::Request> request,
+        std::shared_ptr<SetBlackboard::Response> response)
+  {
+    std::cout<<"This is service 1"<<std::endl;
+  }
+
+  void handle_start_tree(const std::shared_ptr<GoalHandleBTAction> goal_handle)
+  {
+    std::cout<<"This is service 2"<<std::endl;
+  }
+
+
+  rclcpp_action::GoalResponse handle_tree_goal(
+    const rclcpp_action::GoalUUID & uuid,
+    std::shared_ptr<const BTAction::Goal> goal)
+  {
+    RCLCPP_INFO(this->get_logger(), "Received goal request");
+    (void)uuid;
+    return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
+  }
+
+  rclcpp_action::CancelResponse handle_cancel(
+    const std::shared_ptr<GoalHandleBTAction> goal_handle)
+  {
+    RCLCPP_INFO(this->get_logger(), "Received request to cancel goal");
+    (void)goal_handle;
+    return rclcpp_action::CancelResponse::ACCEPT;
+  }
+
+  void handle_accepted(const std::shared_ptr<GoalHandleBTAction> goal_handle)
+  {
+    using namespace std::placeholders;
+    // this needs to return quickly to avoid blocking the executor, so spin up a new thread
+    std::thread{std::bind(&Arborist::handle_start_tree, this, _1), goal_handle}.detach();
+  }
+
+  rclcpp::Service<SetBlackboard>::SharedPtr _set_blackboard;
+  rclcpp_action::Server<BehaviorTreeAction>::SharedPtr _start_tree;
+
+  
+    
+    
+};
+
 
 int main(int argc, char * argv[])
 {
@@ -122,23 +167,35 @@ int main(int argc, char * argv[])
   
 
   rclcpp::init(argc, argv);
+
+  auto node = std::make_shared<Arborist>();
+  rclcpp::spin(node);
+  rclcpp::shutdown();
+
+  // std::string script = " the_answer:='SomeOtherText' ";
   
-  auto nh = std::make_shared<rclcpp::Node>("bt_bandit_client");
+  // std::string _script;
+  // ScriptFunction _executor;
 
-  BehaviorTreeFactory factory;
+  // auto executor = ParseScript(script);
+  // if (!executor)
+  // {
+  //   throw RuntimeError(executor.error());
+  // }
+  // else
+  // {
+  //   _executor = executor.value();
+  //   _script = script;
+  // }
+
+  // if (_executor)
+  // {
+  //   Ast::Environment env = {tree.rootBlackboard(), nullptr};
+  //   _executor(env);
+  // }
 
 
-  RosNodeParams params;
-  params.nh = nh;
-  params.default_port_value = "bandit";
+  //tree.tickWhileRunning();
 
-
-  factory.registerNodeType<BanditAction>("Bandit", params);
-
-
-  auto tree = factory.createTreeFromText(xml_text);
-
-  tree.tickWhileRunning();
-
-  return 0;
+  //return 0;
 }

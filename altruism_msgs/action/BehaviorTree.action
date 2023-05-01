@@ -1,0 +1,5 @@
+#no specific request
+---
+bool is_success
+---
+string node_status
