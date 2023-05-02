@@ -33,6 +33,7 @@ ament_python_install_package(${PROJECT_NAME})
 install(PROGRAMS
   scripts/bandit_action_server.py
   scripts/blackboard_client.py
+  scripts/tree_action_client.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

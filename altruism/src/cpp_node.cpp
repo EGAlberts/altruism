@@ -6,6 +6,7 @@
 
 #include "behaviortree_ros2/bt_action_node.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "rclcpp_action/rclcpp_action.hpp"
 #include "altruism_msgs/action/bandit.hpp"
 #include "altruism_msgs/action/behavior_tree.hpp"
 
@@ -83,7 +84,7 @@ class Arborist : public rclcpp::Node
 public:
   using SetBlackboard = altruism_msgs::srv::SetBlackboard;
   using BTAction = altruism_msgs::action::BehaviorTree;
-  using GoalHandleBTAction = rclcpp_action::ServerGoalHandle<BehaviorTreeAction>;
+  using GoalHandleBTAction = rclcpp_action::ServerGoalHandle<BTAction>;
 
   BT::Tree tree;
   BehaviorTreeFactory factory;
@@ -97,7 +98,7 @@ public:
       "start_tree",
       std::bind(&Arborist::handle_tree_goal, this, _1, _2),
       std::bind(&Arborist::handle_tree_cancel, this, _1),
-      std::bind(&Arborist::handle_tree_accepted, this, _1));\
+      std::bind(&Arborist::handle_tree_accepted, this, _1));
 
       registerCustomNode(factory, "bt_bandit_client", "bandit", "Bandit");
       tree = factory.createTreeFromText(xml_tree);
@@ -120,11 +121,77 @@ private:
         std::shared_ptr<SetBlackboard::Response> response)
   {
     std::cout<<"This is service 1"<<std::endl;
+
+    std::string script = " the_answer:='SomeOtherText' ";
+    
+    std::string _script;
+    ScriptFunction _executor;
+
+    auto executor = ParseScript(script);
+    if (!executor)
+    {
+      throw RuntimeError(executor.error());
+    }
+    else
+    {
+      _executor = executor.value();
+      _script = script;
+    }
+
+    if (_executor)
+    {
+      Ast::Environment env = {tree.rootBlackboard(), nullptr};
+      _executor(env);
+    }
   }
 
   void handle_start_tree(const std::shared_ptr<GoalHandleBTAction> goal_handle)
   {
-    std::cout<<"This is service 2"<<std::endl;
+    RCLCPP_INFO(this->get_logger(), "Executing goal: Starting to tick tree");
+
+    const auto goal = goal_handle->get_goal();
+    auto feedback = std::make_shared<BTAction::Feedback>();
+    feedback->node_status = "placeholder";
+
+    auto result = std::make_shared<BTAction::Result>();
+
+    NodeStatus result_of_tick;
+
+
+    do {
+      // Check if there is a cancel request
+      if (goal_handle->is_canceling()) {
+        result->is_success = false;
+        goal_handle->canceled(result);
+        RCLCPP_INFO(this->get_logger(), "Goal canceled: didn't finish BT");
+        return;
+      }
+      result_of_tick = tree.tickOnce();
+      feedback->node_status = toStr(result_of_tick);
+      // Publish feedback
+      goal_handle->publish_feedback(feedback);
+      // RCLCPP_INFO(this->get_logger(), "Publish feedback");
+
+      // Check if goal is done
+      if(result_of_tick != NodeStatus::RUNNING) {
+        if (rclcpp::ok()) {
+
+          switch(result_of_tick) {
+            case NodeStatus::SUCCESS:
+              result->is_success = true;
+              break;
+            case NodeStatus::FAILURE:
+              result->is_success = false;
+              break;
+          }
+          goal_handle->succeed(result);
+          RCLCPP_INFO(this->get_logger(), "Goal finished: Done ticking the tree");
+          break;
+        }
+
+      }
+    }
+    while(result_of_tick == NodeStatus::RUNNING);
   }
 
 
@@ -137,7 +204,7 @@ private:
     return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
   }
 
-  rclcpp_action::CancelResponse handle_cancel(
+  rclcpp_action::CancelResponse handle_tree_cancel(
     const std::shared_ptr<GoalHandleBTAction> goal_handle)
   {
     RCLCPP_INFO(this->get_logger(), "Received request to cancel goal");
@@ -145,15 +212,17 @@ private:
     return rclcpp_action::CancelResponse::ACCEPT;
   }
 
-  void handle_accepted(const std::shared_ptr<GoalHandleBTAction> goal_handle)
+  void handle_tree_accepted(const std::shared_ptr<GoalHandleBTAction> goal_handle)
   {
+    RCLCPP_INFO(this->get_logger(), "Handle accepted callback");
+
     using namespace std::placeholders;
     // this needs to return quickly to avoid blocking the executor, so spin up a new thread
     std::thread{std::bind(&Arborist::handle_start_tree, this, _1), goal_handle}.detach();
   }
 
   rclcpp::Service<SetBlackboard>::SharedPtr _set_blackboard;
-  rclcpp_action::Server<BehaviorTreeAction>::SharedPtr _start_tree;
+  rclcpp_action::Server<BTAction>::SharedPtr _start_tree;
 
   
     
@@ -172,30 +241,8 @@ int main(int argc, char * argv[])
   rclcpp::spin(node);
   rclcpp::shutdown();
 
-  // std::string script = " the_answer:='SomeOtherText' ";
-  
-  // std::string _script;
-  // ScriptFunction _executor;
-
-  // auto executor = ParseScript(script);
-  // if (!executor)
-  // {
-  //   throw RuntimeError(executor.error());
-  // }
-  // else
-  // {
-  //   _executor = executor.value();
-  //   _script = script;
-  // }
-
-  // if (_executor)
-  // {
-  //   Ast::Environment env = {tree.rootBlackboard(), nullptr};
-  //   _executor(env);
-  // }
 
 
-  //tree.tickWhileRunning();
 
   //return 0;
 }

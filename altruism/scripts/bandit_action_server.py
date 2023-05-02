@@ -29,16 +29,18 @@ class BanditActionServer(Node):
 
         feedback_msg = Bandit.Feedback()
         feedback_msg.chosen_arm = "None"
-
+        temp_count = 0 #temporarily making it so that the bandit actually finishes
         do_bandit = True
         while do_bandit:
             goal_handle.publish_feedback(feedback_msg)
+            temp_count = temp_count+1
             time.sleep(1)
+            if(temp_count == 60): do_bandit = False
 
         goal_handle.succeed()
 
         result = Bandit.Result()
-        result.average_reward = 0
+        result.average_reward = 0.0
         return result
 
 

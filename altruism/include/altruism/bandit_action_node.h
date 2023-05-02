@@ -85,12 +85,24 @@ public:
   // The Cancel request will be send automatically to the server.
   NodeStatus onFeedback(const std::shared_ptr<const Feedback> feedback)
   {
+    std::string some_text;
     std::stringstream ss;
     ss << "Feedback received: ";
     // for (auto number : feedback->left_time) {
     ss << feedback->chosen_arm;
     // }
     RCLCPP_INFO(node_->get_logger(), ss.str().c_str());
+
+    getInput("rb_name", some_text);
+    std::stringstream sstwo;
+
+    sstwo << "Port info received: ";
+    // for (auto number : feedback->left_time) {
+    sstwo << some_text;
+    // }
+    RCLCPP_INFO(node_->get_logger(), sstwo.str().c_str());
+
+
     return NodeStatus::RUNNING;
   }
 };
