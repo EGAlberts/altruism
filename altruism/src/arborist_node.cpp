@@ -11,8 +11,14 @@
 #include "altruism_msgs/action/behavior_tree.hpp"
 
 #include "altruism_msgs/srv/set_blackboard.hpp"
+#include "altruism_msgs/srv/get_blackboard.hpp"
+
 
 #include "altruism/bandit_action_node.h"
+#include "altruism/slam_action_node.h"
+
+#include "altruism/nfr_node.h"
+
 
 
 
@@ -25,21 +31,7 @@ static const char* half_xml_text = R"(
   <BehaviorTree ID="Untitled">
     <Parallel failure_count="1"
               success_count="-1">
-      <NFR property="safety"
-           weight="1.0">
-        <Sequence>
-          <NFR property="cspeed"
-               weight="1.0">
-            <SLAM_fd/>
-          </NFR>
-          <NFR property="cspeed, energy"
-               weight="1.0, 5.0">
-            <SearchAndID_fd/>
-          </NFR>
-          <Pass_fd/>
-        </Sequence>
-      </NFR>
-      <Bandit rb_name="dl"/>
+  
     </Parallel>
   </BehaviorTree>
 </root>
@@ -60,12 +52,31 @@ static const char* bandit_xml = R"(
 static const char* xml_tree = R"(
 <root BTCPP_format="4">
   <BehaviorTree ID="Untitled">
+    <Parallel failure_count="1"
+              success_count="-1">
+      <Sequence>
+        <Script code=" safety_weight:=1.0; the_answer:='SomeText' " />
+        <NFR weight="{safety_weight}">
+          <Bandit rb_name="{the_answer}"/>
+        </NFR>
+      </Sequence>
+      <SLAMfd />
+    </Parallel>
+  </BehaviorTree>
+</root>
+)";
+
+static const char* xml_tree_nonfr = R"(
+<root BTCPP_format="4">
+  <BehaviorTree ID="Untitled">
     <Sequence>
-      <Bandit rb_name="{the_answer}"/>
+      <Script code=" safety_weight:=1.0; the_answer:='SomeText' " />
+        <Bandit rb_name="{the_answer}"/>
     </Sequence>
   </BehaviorTree>
 </root>
 )";
+
 
 static const char* bandit_xml2 = R"(
 <root BTCPP_format="4">
@@ -78,11 +89,11 @@ static const char* bandit_xml2 = R"(
 )";
 
 
-
 class Arborist : public rclcpp::Node
 {
 public:
   using SetBlackboard = altruism_msgs::srv::SetBlackboard;
+  using GetBlackboard = altruism_msgs::srv::GetBlackboard;
   using BTAction = altruism_msgs::action::BehaviorTree;
   using GoalHandleBTAction = rclcpp_action::ServerGoalHandle<BTAction>;
 
@@ -92,6 +103,8 @@ public:
   Arborist(std::string name = "arborist_node") : Node(name)
   {
       _set_blackboard = this->create_service<SetBlackboard>("set_blackboard", std::bind(&Arborist::handle_set_bb, this, _1, _2));
+      _get_blackboard = this->create_service<GetBlackboard>("get_blackboard", std::bind(&Arborist::handle_get_bb, this, _1, _2));
+
       //_start_tree = this->create_service<SetBlackboard>("set_blackboard", std::bind(&Arborist::handle_set_bb, this, _1, _2));
       _start_tree = rclcpp_action::create_server<BTAction>(
       this,
@@ -100,10 +113,16 @@ public:
       std::bind(&Arborist::handle_tree_cancel, this, _1),
       std::bind(&Arborist::handle_tree_accepted, this, _1));
 
-      registerCustomNode(factory, "bt_bandit_client", "bandit", "Bandit");
+      registerCustomNode<BanditAction>(factory, "bt_bandit_client", "bandit", "Bandit");
+      registerCustomNode<SLAMAction>(factory, "bt_slam_client", "slam", "SLAMfd");
+
+      factory.registerNodeType<SafetyNFR>("NFR");
+
+
       tree = factory.createTreeFromText(xml_tree);
   }
 
+  template <class T>
   void registerCustomNode(BehaviorTreeFactory& factory, std::string client_name, std::string action_name, std::string name_in_xml)
   {
     auto nh = std::make_shared<rclcpp::Node>(client_name);
@@ -112,7 +131,7 @@ public:
     params.nh = nh;
     params.default_port_value = action_name;
 
-    factory.registerNodeType<BanditAction>(name_in_xml, params);
+    factory.registerNodeType<T>(name_in_xml, params);
 
   }
 
@@ -122,7 +141,7 @@ private:
   {
     std::cout<<"This is service 1"<<std::endl;
 
-    std::string script = " the_answer:='SomeOtherText' ";
+    std::string script = request->script_code;
     
     std::string _script;
     ScriptFunction _executor;
@@ -130,7 +149,10 @@ private:
     auto executor = ParseScript(script);
     if (!executor)
     {
+      response->success = false;
+
       throw RuntimeError(executor.error());
+      
     }
     else
     {
@@ -143,6 +165,24 @@ private:
       Ast::Environment env = {tree.rootBlackboard(), nullptr};
       _executor(env);
     }
+
+    response->success = true;
+  }
+
+  void handle_get_bb(const std::shared_ptr<GetBlackboard::Request> request,
+        std::shared_ptr<GetBlackboard::Response> response)
+  {
+    std::cout << "Service to get a value from the blackboard" << std::endl;
+
+    const std::string sought_key = request->key_name;
+
+    std::cout << "sought key" << sought_key << std::endl;
+
+    auto entry_value = tree.rootBlackboard()->get<std::string>(sought_key);
+
+    std::cout << "the value is " << entry_value << " gotten from the bb " << std::endl;
+
+    response->key_value = entry_value;
   }
 
   void handle_start_tree(const std::shared_ptr<GoalHandleBTAction> goal_handle)
@@ -222,6 +262,8 @@ private:
   }
 
   rclcpp::Service<SetBlackboard>::SharedPtr _set_blackboard;
+  rclcpp::Service<GetBlackboard>::SharedPtr _get_blackboard;
+
   rclcpp_action::Server<BTAction>::SharedPtr _start_tree;
 
   

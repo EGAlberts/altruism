@@ -15,9 +15,12 @@
   <depend>behaviortree_cpp</depend>
   <depend>behaviortree_ros2</depend>
   <depend>altruism_msgs</depend>
+  <depend>geometry_msgs</depend>
+  
   
   <exec_depend>masced-bandits</exec_depend>
   <exec_depend>masced_bandits</exec_depend>
+  <exec_depend>ros2launch</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

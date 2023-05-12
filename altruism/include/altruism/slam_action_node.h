@@ -6,7 +6,7 @@
 
 #include "behaviortree_ros2/bt_action_node.hpp"
 #include "rclcpp/rclcpp.hpp"
-#include "altruism_msgs/action/bandit.hpp"
+#include "altruism_msgs/action/slam.hpp"
 
 
 using namespace BT;
@@ -14,17 +14,17 @@ using namespace BT;
 
 
 
-using Bandit = altruism_msgs::action::Bandit;
+using SLAM = altruism_msgs::action::SLAM;
 
-class BanditAction: public RosActionNode<Bandit>
+class SLAMAction: public RosActionNode<SLAM>
 {
 public:
-  BanditAction(const std::string& name,
+  SLAMAction(const std::string& name,
                   const NodeConfig& conf,
                   const RosNodeParams& params)
-    : RosActionNode<Bandit>(name, conf, params)
+    : RosActionNode<SLAM>(name, conf, params)
   {
-    std::cout << "Someone made me (a Bandit Action Node) \n\n\n\n\n\n" << std::endl;
+    std::cout << "Someone made me (a SLAM Action Node) \n\n\n\n\n\n" << std::endl;
 
 
   }
@@ -34,7 +34,7 @@ public:
   // using RosActionNode::providedBasicPorts()
   static PortsList providedPorts()
   {
-    return providedBasicPorts({InputPort<std::string>("rb_name")});
+    return providedBasicPorts({});
   }
 
   // This is called when the TreeNode is ticked and it should
@@ -44,7 +44,7 @@ public:
     std::string some_text;
     //goal->parameters = NULL;
     // // get "radius" from the Input port
-    getInput("rb_name", some_text);
+    //getInput("rb_name", some_text);
     std::stringstream ss;
 
     ss << "Port info received: ";
@@ -93,11 +93,11 @@ public:
     std::stringstream ss;
     ss << "Feedback received: ";
     // for (auto number : feedback->left_time) {
-    ss << feedback->chosen_arm;
+    ss << feedback->progress;
     // }
     RCLCPP_INFO(node_->get_logger(), ss.str().c_str());
 
-    getInput("rb_name", some_text);
+    //getInput("rb_name", some_text);
     std::stringstream sstwo;
 
     sstwo << "Port info received: ";

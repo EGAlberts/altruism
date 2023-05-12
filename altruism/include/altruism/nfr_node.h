@@ -30,15 +30,23 @@ class NFRNode : public DecoratorNode
 {
 public:
 
-  NFRNode(const std::string& name, const NodeConfig& config);
+  NFRNode(const std::string& name, const NodeConfig& config) : DecoratorNode(name, config)
+  {
+    std::cout << "Someone made me (an NFR node) \n\n\n\n\n\n" << std::endl;
+
+    // if (!getInput(WEIGHT, weight_))
+    // {
+    //   throw RuntimeError("Missing parameter [", WEIGHT, "] in NFRNode");
+    // }
+
+  }
 
 
   virtual ~NFRNode() override = default;
+  static constexpr const char* WEIGHT = "weight";
+  static constexpr const char* PROPERTY_NAME = "property_name";
 
-  static PortsList providedPorts()
-  {
-    return {InputPort<int>(weight, "How much influence this NFR should have in the calculation of system utility"), InputPort<std::string>(property_name, "Which property does this NFR concern e.g. safety")};
-  }
+
 
 private:
   int weight_;
@@ -47,13 +55,83 @@ private:
   NonFunctionalProperty prop_type;
   bool read_parameter_from_ports_;
   static std::map<std::string, NonFunctionalProperty> s_mapNFPs;
-  static constexpr const char* WEIGHT = "weight";
-  static constexpr const char* PROPERTY_NAME = "property_name";
 
 
-  virtual NodeStatus tick() override;
+  virtual NodeStatus tick() override
+  {
+    setStatus(NodeStatus::RUNNING);
+    const NodeStatus child_status = child_node_->executeTick();
+    //std::cout << "I (an NFR node) just ticked my child \n\n\n\n\n\n" << std::endl;
 
-  void halt() override;
+
+    switch (child_status)
+    {
+      case NodeStatus::SUCCESS: {
+        resetChild();
+        return NodeStatus::SUCCESS;
+      }
+
+      case NodeStatus::FAILURE: {
+        resetChild();
+        return NodeStatus::FAILURE;
+      }
+
+      case NodeStatus::RUNNING: {
+        calculate_measure();
+        return NodeStatus::RUNNING;
+      }
+
+      case NodeStatus::SKIPPED: {
+        return NodeStatus::SKIPPED;
+      }
+      case NodeStatus::IDLE: {
+        throw LogicError("[", name(), "]: A child should not return IDLE");
+      }
+    }
+    return status();
+
+  }
+
+  virtual void calculate_measure()
+  {
+    getInput(WEIGHT, weight_);
+    std::stringstream ss;
+
+    ss << "Weight Port info received: ";
+    // for (auto number : feedback->left_time) {
+    ss << weight_;
+    std::cout << ss.str().c_str() << std::endl;
+    std::cout << "Here's where I would calculate a measure... if I had one" << std::endl;
+  }
+
+  //void halt() override;
+};
+
+class SafetyNFR : public NFRNode
+{
+  public: 
+    SafetyNFR(const std::string& name, const NodeConfig& config) : NFRNode(name, config)
+    {
+      std::cout << "Someone made me (a Safety NFR node) \n\n\n\n\n\n" << std::endl;
+    }
+
+    static PortsList providedPorts()
+    {
+      return {InputPort<int>(WEIGHT, "How much influence this NFR should have in the calculation of system utility"), 
+      OutputPort<float>(MEASURE_NAME, "To what extent is this property fulfilled")};
+    }
+
+    virtual void calculate_measure() override
+    {
+      //std::cout << "Here's where I calculate a SafetyNFR measure" << std::endl;
+      
+      setOutput(MEASURE_NAME,0.0);
+
+    }
+    static constexpr const char* MEASURE_NAME = "safety_measured";
+
+
+
 };
 
 }   // namespace BT
