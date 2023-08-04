@@ -15,7 +15,10 @@
   <depend>behaviortree_cpp</depend>
   <depend>behaviortree_ros2</depend>
   <depend>altruism_msgs</depend>
+  <depend>darknet_ros_msgs</depend>
   <depend>geometry_msgs</depend>
+  <depend>sensor_msgs</depend>
+  
   
   
   <exec_depend>masced-bandits</exec_depend>

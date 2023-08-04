@@ -17,7 +17,7 @@ class BlackboardGetClient(Node):
         self.req = GetBlackboard.Request()
 
     def send_request(self):
-        self.req.key_name = "the_answer"
+        self.req.key_name = "voltage"
         self.future = self.cli.call_async(self.req)
         rclpy.spin_until_future_complete(self, self.future)
         return self.future.result()

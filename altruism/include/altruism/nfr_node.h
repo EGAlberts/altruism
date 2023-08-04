@@ -128,10 +128,38 @@ class SafetyNFR : public NFRNode
       setOutput(MEASURE_NAME,0.0);
 
     }
-    static constexpr const char* MEASURE_NAME = "safety_measured";
+    static constexpr const char* MEASURE_NAME = "safety_metric";
 
 
 
 };
+
+class MissionCompleteNFR : public NFRNode
+{
+  public: 
+    MissionCompleteNFR(const std::string& name, const NodeConfig& config) : NFRNode(name, config)
+    {
+      std::cout << "Someone made me (a MissionComplete NFR node) \n\n\n\n\n\n" << std::endl;
+    }
+
+    static PortsList providedPorts()
+    {
+      return {InputPort<int>(WEIGHT, "How much influence this NFR should have in the calculation of system utility"), 
+      OutputPort<float>(MEASURE_NAME, "To what extent is this property fulfilled")};
+    }
+
+    virtual void calculate_measure() override
+    {
+      //std::cout << "Here's where I calculate a MissionCompleteness measure" << std::endl;
+      
+      setOutput(MEASURE_NAME,0.0);
+
+    }
+    static constexpr const char* MEASURE_NAME = "mission_metric";
+
+
+
+};
+
 
 }   // namespace BT

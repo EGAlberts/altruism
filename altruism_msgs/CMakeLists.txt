@@ -16,6 +16,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "action/Bandit.action"
   "action/BehaviorTree.action"
   "action/SLAM.action"
+  "action/Identify.action"
   "srv/SetBlackboard.srv"
   "srv/GetBlackboard.srv"
 )

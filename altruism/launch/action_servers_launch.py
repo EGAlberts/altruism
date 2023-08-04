@@ -13,4 +13,9 @@ def generate_launch_description():
             executable='bandit_action_server.py',
             name='bandit_action_server'
         ),
+        Node(
+            package='altruism',
+            executable='ID_action_server.py',
+            name='identify_action_server'
+        ),
     ])

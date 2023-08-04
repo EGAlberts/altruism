@@ -10,7 +10,7 @@ from rclpy.node import Node
 class BlackboardSetClient(Node):
 
     def __init__(self):
-        super().__init__('minimal_client_async')
+        super().__init__('minimal_set_blackboard_client_async')
         self.cli = self.create_client(SetBlackboard, '/set_blackboard')
         while not self.cli.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('service not available, waiting again...')

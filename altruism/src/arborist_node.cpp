@@ -16,6 +16,8 @@
 
 #include "altruism/bandit_action_node.h"
 #include "altruism/slam_action_node.h"
+#include "altruism/identify_action_node.h"
+
 
 #include "altruism/nfr_node.h"
 
@@ -55,12 +57,12 @@ static const char* xml_tree = R"(
     <Parallel failure_count="1"
               success_count="-1">
       <Sequence>
-        <Script code=" safety_weight:=1.0; the_answer:='SomeText' " />
-        <NFR weight="{safety_weight}">
-          <Bandit rb_name="{the_answer}"/>
-        </NFR>
+        <Script code="mission_weight:=1.0" />
+        <MissionNFR weight="{mission_weight}">
+          <SLAMfd />
+        </MissionNFR>
       </Sequence>
-      <SLAMfd />
+        <IDfd/>
     </Parallel>
   </BehaviorTree>
 </root>
@@ -115,8 +117,10 @@ public:
 
       registerCustomNode<BanditAction>(factory, "bt_bandit_client", "bandit", "Bandit");
       registerCustomNode<SLAMAction>(factory, "bt_slam_client", "slam", "SLAMfd");
+      registerCustomNode<IdentifyAction>(factory, "bt_identify_client", "identify", "IDfd");
 
-      factory.registerNodeType<SafetyNFR>("NFR");
+
+      factory.registerNodeType<MissionCompleteNFR>("MissionNFR");
 
 
       tree = factory.createTreeFromText(xml_tree);

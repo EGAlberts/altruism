@@ -13,7 +13,10 @@ find_package(rclpy REQUIRED)
 find_package(behaviortree_ros2 REQUIRED)
 find_package(behaviortree_cpp REQUIRED)
 find_package(altruism_msgs REQUIRED)
+find_package(darknet_ros_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+
 
 # Include Cpp "include" directory
 include_directories(include)
@@ -21,7 +24,7 @@ include_directories(include)
 # Create Cpp executable
 add_executable(arborist src/arborist_node.cpp)
 
-ament_target_dependencies(arborist rclcpp behaviortree_ros2 behaviortree_cpp altruism_msgs geometry_msgs)
+ament_target_dependencies(arborist rclcpp behaviortree_ros2 behaviortree_cpp altruism_msgs geometry_msgs sensor_msgs darknet_ros_msgs)
 
 # Install Cpp executables
 install(TARGETS
@@ -36,17 +39,18 @@ ament_python_install_package(${PROJECT_NAME})
 install(PROGRAMS
   scripts/bandit_action_server.py
   scripts/SLAM_action_server.py
+  scripts/ID_action_server.py
   scripts/blackboard_set_client.py
   scripts/blackboard_get_client.py
   scripts/utility_node.py
-
-
+  scripts/system_reflection.py
   scripts/tree_action_client.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
 install(DIRECTORY
   launch
+  worlds
   DESTINATION share/${PROJECT_NAME}/
 )
 

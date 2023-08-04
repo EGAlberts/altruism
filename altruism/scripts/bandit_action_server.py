@@ -41,6 +41,7 @@ class BanditActionServer(Node):
 
         temp_count = 0 #temporarily making it so that the bandit actually finishes
         do_bandit = True
+        self.reward = 0
         while do_bandit:
             feedback_msg = Bandit.Feedback()
             feedback_msg.chosen_arm = self.ucb_instance.get_next_arm(self.reward)
