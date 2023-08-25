@@ -51,18 +51,36 @@ static const char* bandit_xml = R"(
 </root>
 )";
 
+static const char* xml_tree_againn = R"(
+<root BTCPP_format="4">
+  <BehaviorTree ID="Untitled">
+    <Parallel failure_count="1"
+              success_count="-1">
+      <Sequence>
+        <Script code="mission_weight:=1.0"/>
+        <MissionNFR rob_position="{current_position}"
+                    weight="{mission_weight}">
+          <SLAMfd rob_position="{current_position}"/>
+        </MissionNFR>
+      </Sequence>
+      <IDfd/>
+    </Parallel>
+  </BehaviorTree>
+</root>
+)";
+
 static const char* xml_tree = R"(
 <root BTCPP_format="4">
   <BehaviorTree ID="Untitled">
     <Parallel failure_count="1"
               success_count="-1">
       <Sequence>
-        <Script code="mission_weight:=1.0" />
-        <MissionNFR weight="{mission_weight}">
-          <SLAMfd />
+        <Script code="mission_weight:=1.0; current_position:=1.0" />
+        <MissionNFR weight="{mission_weight}" rob_position="{current_position}" objs_identified="{objects_detected}" >
+          <SLAMfd  rob_position="{current_position}" />
         </MissionNFR>
       </Sequence>
-        <IDfd/>
+        <IDfd objs_identified="{objects_detected}"/>
     </Parallel>
   </BehaviorTree>
 </root>

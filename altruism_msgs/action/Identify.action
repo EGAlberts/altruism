@@ -2,4 +2,4 @@ string[] parameters
 ---
 float32 time_elapsed
 ---
-float32 progress
+altruism_msgs/ObjectsIdentified obj_idd

@@ -1,7 +1,10 @@
 #pragma once
 
 #include "behaviortree_cpp/decorator_node.h"
-
+#include "geometry_msgs/msg/pose_stamped.hpp"
+#include "altruism_msgs/msg/objects_identified.hpp"
+#include "builtin_interfaces/msg/time.hpp"
+#include <algorithm>
 namespace BT
 {
 
@@ -136,23 +139,65 @@ class SafetyNFR : public NFRNode
 
 class MissionCompleteNFR : public NFRNode
 {
-  public: 
+  public:
+    int counter;
+    int detection_threshold; 
+    std::string goal_object;
+    int times_detected;
+    builtin_interfaces::msg::Time last_timestamp;
     MissionCompleteNFR(const std::string& name, const NodeConfig& config) : NFRNode(name, config)
     {
       std::cout << "Someone made me (a MissionComplete NFR node) \n\n\n\n\n\n" << std::endl;
+      counter = 0;
+      detection_threshold = 10; //how many times the object needs to be found in a given position to be confirmed to be there.
+      //TODO: make this a parameter.
+      goal_object = "fire hydrant";
+      times_detected = 0;
+      //Also should be a parameter somehow.
     }
 
     static PortsList providedPorts()
     {
       return {InputPort<int>(WEIGHT, "How much influence this NFR should have in the calculation of system utility"), 
-      OutputPort<float>(MEASURE_NAME, "To what extent is this property fulfilled")};
+              InputPort<geometry_msgs::msg::PoseStamped>("rob_position","Robot's current position"),
+              InputPort<altruism_msgs::msg::ObjectsIdentified>("objs_identified","The objects detected through the robot's camera"),
+              OutputPort<float>(MEASURE_NAME, "To what extent is this property fulfilled")};
     }
 
     virtual void calculate_measure() override
     {
+      geometry_msgs::msg::PoseStamped some_pose;
+      altruism_msgs::msg::ObjectsIdentified some_objects;
       //std::cout << "Here's where I calculate a MissionCompleteness measure" << std::endl;
-      
-      setOutput(MEASURE_NAME,0.0);
+      getInput("rob_position", some_pose);
+      getInput("objs_identified", some_objects);
+
+      counter += 1;
+      if((some_objects.object_detected == true) && (some_objects.stamp != last_timestamp))
+      {
+        if(std::find(some_objects.object_names.begin(), some_objects.object_names.end(), goal_object) != std::end(some_objects.object_names)){
+          times_detected += 1;
+          last_timestamp = some_objects.stamp;
+        }
+      }
+
+      double detection_ratio = times_detected / detection_threshold;
+      setOutput(MEASURE_NAME,std::min(detection_ratio,1.0));
+
+      if((counter % 10000) == 0) {
+        std::cout << "\n x from within the NFR mission completeness" << some_pose.pose.position.x << "\n" << std::endl;
+        std::cout << "\n obj_id bool from within the NFR mission completeness" << some_objects.object_detected << "\n" << std::endl;
+        if(some_objects.object_detected == true)
+        {
+          for (auto i: some_objects.object_names) std::cout << i << ' ';
+        }
+        std::cout << "\n detection_ratio " << detection_ratio << "\n" << std::endl;
+        std::cout << "\n times_detected " << times_detected << "\n" << std::endl;
+
+
+
+        counter = 0;
+      }
 
     }
     static constexpr const char* MEASURE_NAME = "mission_metric";

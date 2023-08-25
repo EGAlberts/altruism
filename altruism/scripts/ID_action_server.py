@@ -31,12 +31,19 @@ class IdentifyActionServer(Node):
         self.tb_image = None
         self.counter = 0
         self.prev_done = True
+        self.ID_fdback_msg = Identify.Feedback()
+        self.ID_fdback_msg.obj_idd.object_names = []
+        self.ID_fdback_msg.obj_idd.probabilities = []
+        self.ID_fdback_msg.obj_idd.object_detected = False
+        #bool object_detected
+        #string object_name
+        #float32 probability
         self.get_logger().info('ID Action server created...')
 
     def tb_image_cb(self,msg):
         self.tb_image = msg
         self.counter+=1
-        if(self.counter % 50 == 0): self.get_logger().info('50th Msg Received!!')
+        if(self.counter % 1000 == 0): self.get_logger().info('1000th Msg Received!!')
         if self.counter > 200000: self.counter = 0
 
 
@@ -48,11 +55,11 @@ class IdentifyActionServer(Node):
         while True:
             print("gonna wait 10 seconds now and then try to send the image to identify")
             time.sleep(10)        
-            feedback_msg = Identify.Feedback()
 
-            feedback_msg.progress = 0.0
 
-            #goal_handle.publish_feedback(feedback_msg)
+            
+            self.ID_fdback_msg.obj_idd.stamp = self.get_clock().now().to_msg()
+            goal_handle.publish_feedback(self.ID_fdback_msg)
             if(self.prev_done is True):
                 self.prev_done = False
                 self.send_goal()
@@ -64,16 +71,17 @@ class IdentifyActionServer(Node):
 
         self.get_logger().info("Sending the goal")
 
-        """Send a `NavToPose` action request."""
+        """Send a `CheckForObjects` action request."""
         self.get_logger().debug("Waiting for 'CheckForObjects' action server")
         while not self.check_obj_acclient.wait_for_server(timeout_sec=1.0):
-            self.get_logger().info("'CheckForObjects' action server not available, waiting...")
+            self.get_logger().info("'CheckForObjects' action server was not available, will try again")
+            
 
         goal_msg = CheckForObjects.Goal()
         goal_msg.id = 1
         while self.tb_image is None:
             self.get_logger().info("No image received yet to send, waiting...")
-        self.get_logger().info("Uhh:" + str(type(self.tb_image)))
+        #self.get_logger().info("Uhh:" + str(type(self.tb_image)))
 
         goal_msg.image = self.tb_image
 
@@ -90,10 +98,16 @@ class IdentifyActionServer(Node):
 
         get_result_future = goal_handle.get_result_async()
         rclpy.spin_until_future_complete(self, get_result_future,timeout_sec=20)
-
+        self.ID_fdback_msg.obj_idd.object_names = []
+        self.ID_fdback_msg.obj_idd.probabilities = []
+        self.ID_fdback_msg.obj_idd.object_detected = False
         result = get_result_future.result().result
         if(len(result.bounding_boxes.bounding_boxes) > 0):
+            self.ID_fdback_msg.obj_idd.object_detected = True
+            
             for box_index, box in enumerate(result.bounding_boxes.bounding_boxes):
+                self.ID_fdback_msg.obj_idd.object_names.append(box.class_id)
+                self.ID_fdback_msg.obj_idd.probabilities.append(box.probability)
                 self.get_logger().info('Box: {2} Result: {0} Probability: {1}'.format(box.class_id, str(box.probability), box_index))
         else:
                 self.get_logger().info('nothing detected')

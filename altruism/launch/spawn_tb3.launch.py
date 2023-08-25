@@ -23,16 +23,16 @@ def generate_launch_description():
     box_x_pose = LaunchConfiguration('box_x_pose', default=str(x_random))
     box_y_pose = LaunchConfiguration('box_y_pose', default=str(y_random))
     custom_world =  IncludeLaunchDescription(AnyLaunchDescriptionSource(custom_world_launch_path))
-    
+    model_name = 'fire_hydrant_small'
     spawn_box = Node(
         package='gazebo_ros',
         executable='spawn_entity.py',
         arguments=[
-            '-entity', 'cardboard_box_small1',
-            '-database', 'cardboard_box_small',
+            '-entity', 'object_to_find_1',
+            '-database', model_name,
             '-x', box_x_pose,
             '-y', box_y_pose,
-            '-z', '0.01'
+            '-z', '-0.14'
         ],
         output='screen',
     )

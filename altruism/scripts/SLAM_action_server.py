@@ -57,6 +57,7 @@ class SLAMActionServer(Node):
             pose.pose.position.y = pt[1]
             route_poses.append(deepcopy(pose))
 
+        self.nav2_feedback = None
         self.route_to_follow = cycle(route_poses)
         self.get_logger().info('SLAM Action server created...')
 
@@ -69,8 +70,8 @@ class SLAMActionServer(Node):
             print("gonna wait 10 seconds now and then send the goal to move")
             #time.sleep(10)        
             feedback_msg = SLAM.Feedback()
-
-            feedback_msg.progress = 0.0
+            if(self.nav2_feedback is not None):
+                feedback_msg.current_pose = self.nav2_feedback.current_pose
 
             goal_handle.publish_feedback(feedback_msg)
 
@@ -102,8 +103,8 @@ class SLAMActionServer(Node):
         self.goToPose(next(self.route_to_follow))
         #self.publisher_.publish(next(self.route_to_follow))
     def _feedbackCallback(self, msg):
-        self.get_logger().debug('Received action feedback message')
-        self.feedback = msg.feedback
+        self.get_logger().debug('Received nav2 action feedback message')
+        self.nav2_feedback = msg.feedback
         return
     def goToPose(self, pose, behavior_tree=''):
         """Send a `NavToPose` action request."""

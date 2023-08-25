@@ -14,7 +14,7 @@ from collections import deque
 import time
 import threading
 class SystemReflection(Node):
-
+    
     def __init__(self):
         print("Initializing the node...")
         #self.node_name = 'system_reflection'
@@ -54,14 +54,14 @@ class SystemReflection(Node):
         
         script = self.process_bt_state()
         print("\nscript is " + script + "\n\n")
-        
-        self.req.script_code = script 
-        response = self.cli.call(self.req)
+        if(script != ""):
+            self.req.script_code = script 
+            response = self.cli.call(self.req)
 
-        self.get_logger().info('Result of it ' + str(response.success))
+            self.get_logger().info('Result of it ' + str(response.success))
 
-        
-        self.battery_state = None
+            
+            self.battery_state = None
 
         
 
@@ -74,21 +74,25 @@ class SystemReflection(Node):
         #float32 design_capacity  # Capacity in Ah (design capacity)  (If unmeasured NaN)
         #float32 percentage       # Charge percentage on 0 to 1 range  (If unmeasured NaN)
         
-        bt_state = self.state_queue[-1]
-        assignment_string = ""
-        fields = ["voltage", "temperature", "current", "charge", "capacity", "design_capacity", "percentage"]
-        for field in fields:
-            assignment_string+= field
-            assignment_string+= ":="
-            value = getattr(bt_state,field) #same as doing bt_state.voltage etc. etc.
-            if type(value) == str:
-                assignment_string+= "'" + value + "'"
-            else:
-                assignment_string+= str(value)
-            assignment_string+= "; "
-        
-        assignment_string = assignment_string[:-2]
-        return assignment_string
+        try:
+            bt_state = self.state_queue[-1]
+            assignment_string = ""
+            fields = ["voltage", "temperature", "current", "charge", "capacity", "design_capacity", "percentage"]
+            for field in fields:
+                assignment_string+= field
+                assignment_string+= ":="
+                value = getattr(bt_state,field) #same as doing bt_state.voltage etc. etc.
+                if type(value) == str:
+                    assignment_string+= "'" + value + "'"
+                else:
+                    assignment_string+= str(value)
+                assignment_string+= "; "
+            
+            assignment_string = assignment_string[:-2]
+            return assignment_string
+        except IndexError:
+            #nothing in the queue (yet?)
+            return ""
 
 def main():
     rclpy.init()

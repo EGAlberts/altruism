@@ -7,6 +7,8 @@
 #include "behaviortree_ros2/bt_action_node.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "altruism_msgs/action/identify.hpp"
+#include "altruism_msgs/msg/objects_identified.hpp"
+
 
 
 using namespace BT;
@@ -34,7 +36,7 @@ public:
   // using RosActionNode::providedBasicPorts()
   static PortsList providedPorts()
   {
-    return providedBasicPorts({});
+    return providedBasicPorts({OutputPort<altruism_msgs::msg::ObjectsIdentified>("objs_identified")});
   }
 
   // This is called when the TreeNode is ticked and it should
@@ -91,15 +93,18 @@ public:
   {
     std::string some_text;
     std::stringstream ss;
-    ss << "Feedback received: ";
+    ss << "ID Feedback received obj detected: ";
     // for (auto number : feedback->left_time) {
-    ss << feedback->progress;
+    ss << feedback->obj_idd.object_detected;
     // }
     RCLCPP_INFO(node_->get_logger(), ss.str().c_str());
 
     //getInput("rb_name", some_text);
     std::stringstream sstwo;
-
+    
+    setOutput("objs_identified", feedback->obj_idd); 
+    //of note is that miraculously the BT CPP knows to send this to the current_position field of the blackboard, which is picked up in an NFR, because it is specified in the BT xml
+    
     sstwo << "Port info received: ";
     // for (auto number : feedback->left_time) {
     sstwo << some_text;
