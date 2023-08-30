@@ -12,7 +12,9 @@
 
   <depend>action_msgs</depend>
   <depend>geometry_msgs</depend>
+  <depend>nav_msgs</depend>
   <depend>builtin_interfaces</depend>
+ 
   
 
   <member_of_group>rosidl_interface_packages</member_of_group>

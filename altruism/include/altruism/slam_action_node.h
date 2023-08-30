@@ -60,12 +60,10 @@ public:
   // Based on the reply you may decide to return SUCCESS or FAILURE.
   NodeStatus onResultReceived(const WrappedResult& wr) override
   {
-    // std::stringstream ss;
-    // ss << "Result received: ";
-    // for (auto number : wr.result) {
-    //   ss << number << " ";
-    // }
-    // RCLCPP_INFO(node_->get_logger(), ss.str().c_str());
+    std::stringstream ss;
+    ss << "SLAM Result received: " << wr.result->time_elapsed;
+  
+    RCLCPP_INFO(node_->get_logger(), ss.str().c_str());
     return NodeStatus::SUCCESS;
   }
 

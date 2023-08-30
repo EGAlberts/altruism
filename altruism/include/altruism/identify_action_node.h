@@ -3,17 +3,16 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <cstdlib>
 
 #include "behaviortree_ros2/bt_action_node.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "altruism_msgs/action/identify.hpp"
 #include "altruism_msgs/msg/objects_identified.hpp"
-
+#include "nav_msgs/srv/get_map.hpp"
 
 
 using namespace BT;
-
-
 
 
 using ID = altruism_msgs::action::Identify;
@@ -43,11 +42,39 @@ public:
   // send the request to the action server
   bool setGoal(RosActionNode::Goal& goal) override 
   {
+
+    rclcpp::Client<nav_msgs::srv::GetMap>::SharedPtr client = node_->create_client<nav_msgs::srv::GetMap>("/slam_toolbox/dynamic_map");
     std::string some_text;
+
+    auto request = std::make_shared<nav_msgs::srv::GetMap::Request>();
+
+    while (!client->wait_for_service(std::chrono::seconds(1))) {
+    if (!rclcpp::ok()) {
+      RCLCPP_ERROR(node_->get_logger(), "Interrupted while waiting for the service. Exiting.");
+      return 0;
+    }
+    RCLCPP_INFO(node_->get_logger(), "service not available, waiting again...");
+  }
+
+  auto result = client->async_send_request(request);
+  // Wait for the result.
+  if (rclcpp::spin_until_future_complete(node_, result) ==
+    rclcpp::FutureReturnCode::SUCCESS)
+  {
+    goal.map = result.get()->map;
+    RCLCPP_INFO(node_->get_logger(), "Success getting map");
+
+  } else {
+    RCLCPP_ERROR(node_->get_logger(), "Failed to call service get map");
+    return false;
+  }
+
     //goal->parameters = NULL;
     // // get "radius" from the Input port
     //getInput("rb_name", some_text);
     std::stringstream ss;
+    
+    
 
     ss << "Port info received: ";
     // for (auto number : feedback->left_time) {
@@ -62,12 +89,10 @@ public:
   // Based on the reply you may decide to return SUCCESS or FAILURE.
   NodeStatus onResultReceived(const WrappedResult& wr) override
   {
-    // std::stringstream ss;
-    // ss << "Result received: ";
-    // for (auto number : wr.result) {
-    //   ss << number << " ";
-    // }
-    // RCLCPP_INFO(node_->get_logger(), ss.str().c_str());
+    std::stringstream ss;
+    ss << "ID Result received: " << wr.result->time_elapsed;
+  
+    RCLCPP_INFO(node_->get_logger(), ss.str().c_str());
     return NodeStatus::SUCCESS;
   }
 

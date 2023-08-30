@@ -16,7 +16,7 @@ find_package(altruism_msgs REQUIRED)
 find_package(darknet_ros_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
-
+find_package(slam_toolbox REQUIRED)
 
 # Include Cpp "include" directory
 include_directories(include)
@@ -24,7 +24,7 @@ include_directories(include)
 # Create Cpp executable
 add_executable(arborist src/arborist_node.cpp)
 
-ament_target_dependencies(arborist rclcpp behaviortree_ros2 behaviortree_cpp altruism_msgs geometry_msgs sensor_msgs darknet_ros_msgs)
+ament_target_dependencies(arborist rclcpp behaviortree_ros2 behaviortree_cpp altruism_msgs geometry_msgs sensor_msgs darknet_ros_msgs slam_toolbox)
 
 # Install Cpp executables
 install(TARGETS
@@ -45,6 +45,7 @@ install(PROGRAMS
   scripts/utility_node.py
   scripts/system_reflection.py
   scripts/tree_action_client.py
+  scripts/save_map_client.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

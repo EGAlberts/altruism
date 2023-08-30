@@ -28,48 +28,69 @@ using namespace BT;
 using std::placeholders::_1;
 using std::placeholders::_2;
 
-static const char* half_xml_text = R"(
-<root BTCPP_format="4">
-  <BehaviorTree ID="Untitled">
-    <Parallel failure_count="1"
-              success_count="-1">
+// static const char* half_xml_text = R"(
+// <root BTCPP_format="4">
+//   <BehaviorTree ID="Untitled">
+//     <Parallel failure_count="1"
+//               success_count="-1">
   
-    </Parallel>
-  </BehaviorTree>
-</root>
-)";
+//     </Parallel>
+//   </BehaviorTree>
+// </root>
+// )";
 
 
-static const char* bandit_xml = R"(
-<root BTCPP_format="4">
-  <BehaviorTree ID="Untitled">
-    <Sequence>
-      <Script code=" the_answer:='SomeText' " />
-      <Bandit rb_name="{the_answer}"/>
-    </Sequence>
-  </BehaviorTree>
-</root>
-)";
+// static const char* bandit_xml = R"(
+// <root BTCPP_format="4">
+//   <BehaviorTree ID="Untitled">
+//     <Sequence>
+//       <Script code=" the_answer:='SomeText' " />
+//       <Bandit rb_name="{the_answer}"/>
+//     </Sequence>
+//   </BehaviorTree>
+// </root>
+// )";
 
-static const char* xml_tree_againn = R"(
-<root BTCPP_format="4">
-  <BehaviorTree ID="Untitled">
-    <Parallel failure_count="1"
-              success_count="-1">
-      <Sequence>
-        <Script code="mission_weight:=1.0"/>
-        <MissionNFR rob_position="{current_position}"
-                    weight="{mission_weight}">
-          <SLAMfd rob_position="{current_position}"/>
-        </MissionNFR>
-      </Sequence>
-      <IDfd/>
-    </Parallel>
-  </BehaviorTree>
-</root>
-)";
+// static const char* xml_tree_againn = R"(
+// <root BTCPP_format="4">
+//   <BehaviorTree ID="Untitled">
+//     <Parallel failure_count="1"
+//               success_count="-1">
+//       <Sequence>
+//         <Script code="mission_weight:=1.0"/>
+//         <MissionNFR rob_position="{current_position}"
+//                     weight="{mission_weight}">
+//           <SLAMfd rob_position="{current_position}"/>
+//         </MissionNFR>
+//       </Sequence>
+//       <IDfd/>
+//     </Parallel>
+//   </BehaviorTree>
+// </root>
+// )";
+//in_voltage="{voltage}" in_temperature="{temperature}" in_current="{current}" in_charge="{charge}" in_capacity="{capacity}" in_design_capacity="{design_capacity}" in_percentage="{percentage}"
 
 static const char* xml_tree = R"(
+<root BTCPP_format="4">
+  <BehaviorTree ID="Untitled">
+    <Parallel failure_count="1"
+              success_count="-1">
+      <EnergyNFR weight="{energy_weight}" in_voltage="{voltage}" in_temperature="{temperature}" in_current="{current}" in_charge="{charge}" in_capacity="{capacity}" in_design_capacity="{design_capacity}" in_percentage="{percentage}">
+      <Sequence>
+        <Script code="mission_weight:=1.0; current_position:=1.0" />
+        <SLAMfd  rob_position="{current_position}" />
+        <MissionNFR weight="{mission_weight}" rob_position="{current_position}" objs_identified="{objects_detected}" >
+          <IDfd objs_identified="{objects_detected}"/>
+        </MissionNFR>
+      </Sequence>
+      </EnergyNFR>
+        <AlwaysSuccess />
+    </Parallel>
+  </BehaviorTree>
+</root>
+)";
+
+static const char* xml_treeA = R"(
 <root BTCPP_format="4">
   <BehaviorTree ID="Untitled">
     <Parallel failure_count="1"
@@ -77,36 +98,36 @@ static const char* xml_tree = R"(
       <Sequence>
         <Script code="mission_weight:=1.0; current_position:=1.0" />
         <MissionNFR weight="{mission_weight}" rob_position="{current_position}" objs_identified="{objects_detected}" >
-          <SLAMfd  rob_position="{current_position}" />
+          <AlwaysSuccess />
         </MissionNFR>
       </Sequence>
-        <IDfd objs_identified="{objects_detected}"/>
+          <SLAMfd  rob_position="{current_position}" />
     </Parallel>
   </BehaviorTree>
 </root>
 )";
 
-static const char* xml_tree_nonfr = R"(
-<root BTCPP_format="4">
-  <BehaviorTree ID="Untitled">
-    <Sequence>
-      <Script code=" safety_weight:=1.0; the_answer:='SomeText' " />
-        <Bandit rb_name="{the_answer}"/>
-    </Sequence>
-  </BehaviorTree>
-</root>
-)";
+// static const char* xml_tree_nonfr = R"(
+// <root BTCPP_format="4">
+//   <BehaviorTree ID="Untitled">
+//     <Sequence>
+//       <Script code=" safety_weight:=1.0; the_answer:='SomeText' " />
+//         <Bandit rb_name="{the_answer}"/>
+//     </Sequence>
+//   </BehaviorTree>
+// </root>
+// )";
 
 
-static const char* bandit_xml2 = R"(
-<root BTCPP_format="4">
-  <BehaviorTree ID="Untitled">
-    <Sequence>
-      <Bandit rb_name="{the_answer}"/>
-    </Sequence>
-  </BehaviorTree>
-</root>
-)";
+// static const char* bandit_xml2 = R"(
+// <root BTCPP_format="4">
+//   <BehaviorTree ID="Untitled">
+//     <Sequence>
+//       <Bandit rb_name="{the_answer}"/>
+//     </Sequence>
+//   </BehaviorTree>
+// </root>
+// )";
 
 
 class Arborist : public rclcpp::Node
@@ -139,6 +160,8 @@ public:
 
 
       factory.registerNodeType<MissionCompleteNFR>("MissionNFR");
+      factory.registerNodeType<EnergyNFR>("EnergyNFR");
+
 
 
       tree = factory.createTreeFromText(xml_tree);

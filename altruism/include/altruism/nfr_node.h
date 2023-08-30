@@ -5,6 +5,8 @@
 #include "altruism_msgs/msg/objects_identified.hpp"
 #include "builtin_interfaces/msg/time.hpp"
 #include <algorithm>
+#include <chrono>
+#include <ctime> 
 namespace BT
 {
 
@@ -141,19 +143,28 @@ class MissionCompleteNFR : public NFRNode
 {
   public:
     int counter;
-    int detection_threshold; 
+    double detection_threshold; 
     std::string goal_object;
-    int times_detected;
+    double times_detected;
     builtin_interfaces::msg::Time last_timestamp;
+    double max_detected;
+    int detected_in_window;
+    int window_length;
+    int window_start;
     MissionCompleteNFR(const std::string& name, const NodeConfig& config) : NFRNode(name, config)
     {
       std::cout << "Someone made me (a MissionComplete NFR node) \n\n\n\n\n\n" << std::endl;
       counter = 0;
+      window_length = 20;
       detection_threshold = 10; //how many times the object needs to be found in a given position to be confirmed to be there.
+      max_detected = 1 * window_length; //What we presume is the max number of objects that'll be detected in a 20 second window.
       //TODO: make this a parameter.
       goal_object = "fire hydrant";
-      times_detected = 0;
-      //Also should be a parameter somehow.
+      times_detected = 0; //Also should be a parameter somehow.
+      detected_in_window = 0.0;
+      window_start = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+      
+
     }
 
     static PortsList providedPorts()
@@ -161,12 +172,12 @@ class MissionCompleteNFR : public NFRNode
       return {InputPort<int>(WEIGHT, "How much influence this NFR should have in the calculation of system utility"), 
               InputPort<geometry_msgs::msg::PoseStamped>("rob_position","Robot's current position"),
               InputPort<altruism_msgs::msg::ObjectsIdentified>("objs_identified","The objects detected through the robot's camera"),
-              OutputPort<float>(MEASURE_NAME, "To what extent is this property fulfilled")};
+              OutputPort<double>(MEASURE_NAME, "To what extent is this property fulfilled")};
     }
 
     virtual void calculate_measure() override
     {
-      geometry_msgs::msg::PoseStamped some_pose;
+      geometry_msgs::msg::PoseStamped some_pose; //probably won't be used after all..
       altruism_msgs::msg::ObjectsIdentified some_objects;
       //std::cout << "Here's where I calculate a MissionCompleteness measure" << std::endl;
       getInput("rob_position", some_pose);
@@ -175,15 +186,27 @@ class MissionCompleteNFR : public NFRNode
       counter += 1;
       if((some_objects.object_detected == true) && (some_objects.stamp != last_timestamp))
       {
-        if(std::find(some_objects.object_names.begin(), some_objects.object_names.end(), goal_object) != std::end(some_objects.object_names)){
-          times_detected += 1;
-          last_timestamp = some_objects.stamp;
-        }
+        // if(std::find(some_objects.object_names.begin(), some_objects.object_names.end(), goal_object) != std::end(some_objects.object_names)){
+        //   times_detected += 1;
+        //   last_timestamp = some_objects.stamp;
+        // }
+        detected_in_window += some_objects.object_names.size();
+        last_timestamp = some_objects.stamp;
       }
 
-      double detection_ratio = times_detected / detection_threshold;
-      setOutput(MEASURE_NAME,std::min(detection_ratio,1.0));
+      //double detection_ratio = times_detected / detection_threshold;
+      double detection_ratio = (double)detected_in_window / max_detected;
 
+      auto curr_time_pointer = std::chrono::system_clock::now();
+      
+      int current_time = std::chrono::duration_cast<std::chrono::seconds>(curr_time_pointer.time_since_epoch()).count();
+      int elapsed_seconds = current_time-window_start;
+      if(elapsed_seconds >= window_length)
+      {
+        setOutput(MEASURE_NAME,std::min(detection_ratio,1.0));
+        window_start = current_time;
+        detected_in_window = 0;
+      }
       if((counter % 10000) == 0) {
         std::cout << "\n x from within the NFR mission completeness" << some_pose.pose.position.x << "\n" << std::endl;
         std::cout << "\n obj_id bool from within the NFR mission completeness" << some_objects.object_detected << "\n" << std::endl;
@@ -192,12 +215,15 @@ class MissionCompleteNFR : public NFRNode
           for (auto i: some_objects.object_names) std::cout << i << ' ';
         }
         std::cout << "\n detection_ratio " << detection_ratio << "\n" << std::endl;
-        std::cout << "\n times_detected " << times_detected << "\n" << std::endl;
+        std::cout << "\n detected_in_window " << detected_in_window << "\n" << std::endl;
 
 
 
         counter = 0;
       }
+
+
+
 
     }
     static constexpr const char* MEASURE_NAME = "mission_metric";
@@ -205,6 +231,118 @@ class MissionCompleteNFR : public NFRNode
 
 
 };
+
+class EnergyNFR : public NFRNode
+{
+  public:
+    int counter;
+    double detection_threshold; 
+    std::string goal_object;
+    double times_detected;
+    builtin_interfaces::msg::Time last_timestamp;
+    double max_detected;
+    int detected_in_window;
+    int window_length;
+    int window_start;
+    EnergyNFR(const std::string& name, const NodeConfig& config) : NFRNode(name, config)
+    {
+      std::cout << "Someone made me (a Energy NFR node) \n\n\n\n\n\n" << std::endl;
+      counter = 0;
+      window_length = 20;
+      detection_threshold = 10; //how many times the object needs to be found in a given position to be confirmed to be there.
+      max_detected = 1 * window_length; //What we presume is the max number of objects that'll be detected in a 20 second window.
+      //TODO: make this a parameter.
+      goal_object = "fire hydrant";
+      times_detected = 0; //Also should be a parameter somehow.
+      detected_in_window = 0.0;
+      window_start = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+      
+
+    }
+
+    static PortsList providedPorts()
+    {
+
+      return {InputPort<int>(WEIGHT, "How much influence this NFR should have in the calculation of system utility"), 
+              InputPort<float>("in_voltage","voltage"),
+              InputPort<float>("in_temperature","temperature"),
+              InputPort<float>("in_current","current"),
+              InputPort<float>("in_charge","charge"),
+              InputPort<float>("in_capacity","capacity"),
+              InputPort<float>("in_design_capacity","design_capacity"),
+              InputPort<float>("in_percentage","percentage"),
+              OutputPort<double>(MEASURE_NAME, "To what extent is this property fulfilled")};
+    }
+
+    virtual void calculate_measure() override
+    {
+      float voltage;
+      float temperature;
+      float current;
+      float charge;
+      float capacity;
+      float design_capacity;
+      float percentage;
+      //std::cout << "Here's where I calculate a MissionCompleteness measure" << std::endl;
+      getInput("in_voltage",voltage);
+      getInput("in_temperature",temperature);
+      getInput("in_current",current);
+      getInput("in_charge",charge);
+      getInput("in_capacity",capacity);
+      getInput("in_design_capacity",design_capacity);
+      getInput("in_percentage",percentage);
+
+      std::cout << "\n x from within the NFR emergy" << voltage << "\n" << std::endl;
+
+      // counter += 1;
+      // if((some_objects.object_detected == true) && (some_objects.stamp != last_timestamp))
+      // {
+      //   // if(std::find(some_objects.object_names.begin(), some_objects.object_names.end(), goal_object) != std::end(some_objects.object_names)){
+      //   //   times_detected += 1;
+      //   //   last_timestamp = some_objects.stamp;
+      //   // }
+      //   detected_in_window += some_objects.object_names.size();
+      //   last_timestamp = some_objects.stamp;
+      // }
+
+      // //double detection_ratio = times_detected / detection_threshold;
+      // double detection_ratio = (double)detected_in_window / max_detected;
+
+      // auto curr_time_pointer = std::chrono::system_clock::now();
+      
+      // int current_time = std::chrono::duration_cast<std::chrono::seconds>(curr_time_pointer.time_since_epoch()).count();
+      // int elapsed_seconds = current_time-window_start;
+      // if(elapsed_seconds >= window_length)
+      // {
+      //   setOutput(MEASURE_NAME,std::min(detection_ratio,1.0));
+      //   window_start = current_time;
+      //   detected_in_window = 0;
+      // }
+      // if((counter % 10000) == 0) {
+      //   std::cout << "\n x from within the NFR mission completeness" << some_pose.pose.position.x << "\n" << std::endl;
+      //   std::cout << "\n obj_id bool from within the NFR mission completeness" << some_objects.object_detected << "\n" << std::endl;
+      //   if(some_objects.object_detected == true)
+      //   {
+      //     for (auto i: some_objects.object_names) std::cout << i << ' ';
+      //   }
+      //   std::cout << "\n detection_ratio " << detection_ratio << "\n" << std::endl;
+      //   std::cout << "\n detected_in_window " << detected_in_window << "\n" << std::endl;
+
+
+
+      //   counter = 0;
+      // }
+
+
+
+
+    }
+    static constexpr const char* MEASURE_NAME = "mission_metric";
+
+
+
+};
+
 
 
 }   // namespace BT

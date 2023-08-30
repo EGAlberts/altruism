@@ -1,4 +1,4 @@
-string[] parameters
+nav_msgs/OccupancyGrid map
 ---
 float32 time_elapsed
 ---
