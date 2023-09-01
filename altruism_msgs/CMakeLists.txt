@@ -22,7 +22,11 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "action/Identify.action"
   "srv/SetBlackboard.srv"
   "srv/GetBlackboard.srv"
+  "srv/GetNFR.srv"
+  "srv/SetWeights.srv"
   "msg/ObjectsIdentified.msg"
+  "msg/NFR.msg"
+
   DEPENDENCIES builtin_interfaces geometry_msgs nav_msgs
 )
 if(BUILD_TESTING)

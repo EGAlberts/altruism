@@ -3,6 +3,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "behaviortree_ros2/bt_action_node.hpp"
 #include "rclcpp/rclcpp.hpp"
@@ -12,6 +13,11 @@
 
 #include "altruism_msgs/srv/set_blackboard.hpp"
 #include "altruism_msgs/srv/get_blackboard.hpp"
+#include "altruism_msgs/srv/get_nfr.hpp"
+#include "altruism_msgs/srv/set_weights.hpp"
+#include "altruism_msgs/msg/nfr.hpp"
+
+
 
 
 #include "altruism/bandit_action_node.h"
@@ -75,11 +81,11 @@ static const char* xml_tree = R"(
   <BehaviorTree ID="Untitled">
     <Parallel failure_count="1"
               success_count="-1">
-      <EnergyNFR weight="{energy_weight}" in_voltage="{voltage}" in_temperature="{temperature}" in_current="{current}" in_charge="{charge}" in_capacity="{capacity}" in_design_capacity="{design_capacity}" in_percentage="{percentage}">
+      <EnergyNFR weight="{energy_weight}" in_voltage="{voltage}" in_temperature="{temperature}" in_current="{current}" in_charge="{charge}" in_capacity="{capacity}" in_design_capacity="{design_capacity}" in_percentage="{percentage}" metric="{energy_metric}">
       <Sequence>
-        <Script code="mission_weight:=1.0; current_position:=1.0" />
+        <Script code="mission_weight:=1.0; current_position:=1.0; energy_weight=1.0; energy_metric:=1.0; mission_metric:=1.0" />
         <SLAMfd  rob_position="{current_position}" />
-        <MissionNFR weight="{mission_weight}" rob_position="{current_position}" objs_identified="{objects_detected}" >
+        <MissionNFR weight="{mission_weight}" rob_position="{current_position}" objs_identified="{objects_detected}" metric="{mission_metric}" >
           <IDfd objs_identified="{objects_detected}"/>
         </MissionNFR>
       </Sequence>
@@ -135,6 +141,9 @@ class Arborist : public rclcpp::Node
 public:
   using SetBlackboard = altruism_msgs::srv::SetBlackboard;
   using GetBlackboard = altruism_msgs::srv::GetBlackboard;
+  using GetNFR = altruism_msgs::srv::GetNFR;
+  using SetWeights = altruism_msgs::srv::SetWeights;
+  using NFR_MSG = altruism_msgs::msg::NFR;
   using BTAction = altruism_msgs::action::BehaviorTree;
   using GoalHandleBTAction = rclcpp_action::ServerGoalHandle<BTAction>;
 
@@ -145,6 +154,10 @@ public:
   {
       _set_blackboard = this->create_service<SetBlackboard>("set_blackboard", std::bind(&Arborist::handle_set_bb, this, _1, _2));
       _get_blackboard = this->create_service<GetBlackboard>("get_blackboard", std::bind(&Arborist::handle_get_bb, this, _1, _2));
+      _get_nfr = this->create_service<GetNFR>("get_nfr", std::bind(&Arborist::handle_get_nfr, this, _1, _2));
+      _set_weights = this->create_service<SetWeights>("set_weights", std::bind(&Arborist::handle_set_weights, this, _1, _2));
+
+
 
       //_start_tree = this->create_service<SetBlackboard>("set_blackboard", std::bind(&Arborist::handle_set_bb, this, _1, _2));
       _start_tree = rclcpp_action::create_server<BTAction>(
@@ -181,20 +194,16 @@ public:
   }
 
 private:
-  void handle_set_bb(const std::shared_ptr<SetBlackboard::Request> request,
-        std::shared_ptr<SetBlackboard::Response> response)
-  {
-    std::cout<<"This is service 1"<<std::endl;
 
-    std::string script = request->script_code;
-    
+  bool inject_script_node(std::string script)
+  {
     std::string _script;
     ScriptFunction _executor;
 
     auto executor = ParseScript(script);
     if (!executor)
     {
-      response->success = false;
+      return false;
 
       throw RuntimeError(executor.error());
       
@@ -211,7 +220,17 @@ private:
       _executor(env);
     }
 
-    response->success = true;
+    return true;
+    
+  }
+  void handle_set_bb(const std::shared_ptr<SetBlackboard::Request> request,
+        std::shared_ptr<SetBlackboard::Response> response)
+  {
+    std::cout<<"Set BlackBoard Service Called in Arborist Node"<<std::endl;
+
+    std::string script = request->script_code;
+    
+    response->success = inject_script_node(script);
   }
 
   void handle_get_bb(const std::shared_ptr<GetBlackboard::Request> request,
@@ -229,6 +248,104 @@ private:
 
     response->key_value = entry_value;
   }
+
+  std::vector<TreeNode::Ptr> get_tree_nfrs()
+  {    
+    std::vector<TreeNode::Ptr> nfr_nodes;
+    for (auto & sbtree : tree.subtrees) 
+    {
+      for (auto & node : sbtree->nodes) 
+      {
+        if(node->type() == NodeType::DECORATOR && (node->registrationName().find("NFR") != std::string::npos))
+        {
+          nfr_nodes.push_back(node);
+        }
+      }
+    }
+    return nfr_nodes;
+  }
+  
+  void handle_get_nfr(const std::shared_ptr<GetNFR::Request> request,
+        std::shared_ptr<GetNFR::Response> response)
+  {
+    auto nfr_nodes = get_tree_nfrs();
+    for (auto & node : nfr_nodes) 
+    {
+      if(node->status() == NodeStatus::RUNNING) //ensures that the NFRs are currently in effect.
+      {
+      auto node_config = node->config();
+
+      auto weight = node_config.input_ports.find(NFRNode::WEIGHT);
+      auto metric = node_config.output_ports.find(NFRNode::METRIC);
+
+      if (weight == node_config.input_ports.end() || metric == node_config.output_ports.end())
+      {
+        std::cout << "weight or metric not found" << std::endl;
+        return;
+      }
+
+      auto metric_bb_value = tree.rootBlackboard()->get<double>((std::string)TreeNode::stripBlackboardPointer(metric->second));
+      auto weight_bb_value = tree.rootBlackboard()->get<double>((std::string)TreeNode::stripBlackboardPointer(weight->second));
+
+      NFR_MSG nfr_msg;
+      nfr_msg.nfr_name = node->registrationName();
+      nfr_msg.metric = metric_bb_value; 
+      nfr_msg.weight = weight_bb_value;
+
+      response->nfrs_in_tree.push_back(nfr_msg);
+      }
+    }
+  }
+
+  void handle_set_weights(const std::shared_ptr<SetWeights::Request> request,
+        std::shared_ptr<SetWeights::Response> response)
+  {
+    std::string script = "";
+    auto nfr_nodes = get_tree_nfrs();
+    auto nfr_msgs = request->nfrs_to_update;
+
+
+    for (NFR_MSG & nfr_msg : nfr_msgs)
+    {
+      std::string nfr_name = nfr_msg.nfr_name;
+    
+      for (auto & node : nfr_nodes) 
+      {
+        if(nfr_name == node->registrationName())
+        {
+          auto node_config = node->config();
+
+          auto weight = node_config.input_ports.find(NFRNode::WEIGHT);
+
+          if (weight == node_config.input_ports.end())
+          {
+            std::cout << "weight not found" << std::endl;
+            return;
+          }
+          
+          std::string weight_bb_key = (std::string)TreeNode::stripBlackboardPointer(weight->second);
+
+          std::cout << (float)nfr_msg.weight << " uh " << std::endl;
+          float weight_as_float = (float)nfr_msg.weight;
+          script += weight_bb_key;
+          script += ":=";
+          script += std::to_string(nfr_msg.weight);
+          script += "; ";
+        }
+
+      }
+
+    }
+
+    std::cout << "The script inside set_weights " << script << std::endl;
+    script.pop_back();
+    script.pop_back(); //Removing the last '; ' as it isn't necessary.
+
+    response->success = inject_script_node(script);
+
+  }
+
+
 
   void handle_start_tree(const std::shared_ptr<GoalHandleBTAction> goal_handle)
   {
@@ -308,6 +425,10 @@ private:
 
   rclcpp::Service<SetBlackboard>::SharedPtr _set_blackboard;
   rclcpp::Service<GetBlackboard>::SharedPtr _get_blackboard;
+  rclcpp::Service<GetNFR>::SharedPtr _get_nfr;
+  rclcpp::Service<SetWeights>::SharedPtr _set_weights;
+
+
 
   rclcpp_action::Server<BTAction>::SharedPtr _start_tree;
 

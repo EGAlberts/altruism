@@ -46,6 +46,7 @@ install(PROGRAMS
   scripts/system_reflection.py
   scripts/tree_action_client.py
   scripts/save_map_client.py
+  scripts/weights_set_client.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

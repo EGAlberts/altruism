@@ -77,7 +77,7 @@ class SystemReflection(Node):
         try:
             bt_state = self.state_queue[-1]
             assignment_string = ""
-            fields = ["voltage", "temperature", "current", "charge", "capacity", "design_capacity", "percentage"]
+            fields = ["voltage", "temperature", "current", "charge", "capacity", "design_capacity", "percentage"] #paramterize?
             for field in fields:
                 assignment_string+= field
                 assignment_string+= ":="

@@ -30,6 +30,12 @@ enum class NonFunctionalProperty
  * <Repeat num_cycles="3">
  *   <ClapYourHandsOnce/>
  * </Repeat>
+ * 
+ * 
+ * 
+ * Note: If in the future a BT should be designed with multiple instances of the same NFR, it would become impractical. Right now the only feasible case it having two NFRs which are never active simultaneously. 
+ * In all other cases it would require creating a new (very similar) subclass as the linked blackboard entries would otherwise cause issue.
+ * Additionally, the existing Arborist Node services for grabbing NFRs rely on the xml entry for the NFR being unique.. these would need to be updated if the latter were resolved somehow.
  */
 class NFRNode : public DecoratorNode
 {
@@ -48,9 +54,16 @@ public:
 
 
   virtual ~NFRNode() override = default;
-  static constexpr const char* WEIGHT = "weight";
-  static constexpr const char* PROPERTY_NAME = "property_name";
 
+  //Name for the weight input port
+  static constexpr const char* WEIGHT = "weight";
+
+  //Name for the metric input port
+  static constexpr const char* METRIC = "metric";
+
+  static constexpr const char* PROPERTY_NAME = "property_name";
+  
+  
 
 
 private:
@@ -122,18 +135,17 @@ class SafetyNFR : public NFRNode
 
     static PortsList providedPorts()
     {
-      return {InputPort<int>(WEIGHT, "How much influence this NFR should have in the calculation of system utility"), 
-      OutputPort<float>(MEASURE_NAME, "To what extent is this property fulfilled")};
+      return {InputPort<double>(WEIGHT, "How much influence this NFR should have in the calculation of system utility"), 
+      OutputPort<double>(METRIC, "To what extent is this property fulfilled")};
     }
 
     virtual void calculate_measure() override
     {
       //std::cout << "Here's where I calculate a SafetyNFR measure" << std::endl;
       
-      setOutput(MEASURE_NAME,0.0);
+      setOutput(METRIC,0.0);
 
     }
-    static constexpr const char* MEASURE_NAME = "safety_metric";
 
 
 
@@ -169,10 +181,10 @@ class MissionCompleteNFR : public NFRNode
 
     static PortsList providedPorts()
     {
-      return {InputPort<int>(WEIGHT, "How much influence this NFR should have in the calculation of system utility"), 
+      return {InputPort<double>(WEIGHT, "How much influence this NFR should have in the calculation of system utility"), 
               InputPort<geometry_msgs::msg::PoseStamped>("rob_position","Robot's current position"),
               InputPort<altruism_msgs::msg::ObjectsIdentified>("objs_identified","The objects detected through the robot's camera"),
-              OutputPort<double>(MEASURE_NAME, "To what extent is this property fulfilled")};
+              OutputPort<double>(METRIC, "To what extent is this property fulfilled")};
     }
 
     virtual void calculate_measure() override
@@ -203,7 +215,7 @@ class MissionCompleteNFR : public NFRNode
       int elapsed_seconds = current_time-window_start;
       if(elapsed_seconds >= window_length)
       {
-        setOutput(MEASURE_NAME,std::min(detection_ratio,1.0));
+        setOutput(METRIC,std::min(detection_ratio,1.0));
         window_start = current_time;
         detected_in_window = 0;
       }
@@ -226,7 +238,6 @@ class MissionCompleteNFR : public NFRNode
 
 
     }
-    static constexpr const char* MEASURE_NAME = "mission_metric";
 
 
 
@@ -263,7 +274,7 @@ class EnergyNFR : public NFRNode
     static PortsList providedPorts()
     {
 
-      return {InputPort<int>(WEIGHT, "How much influence this NFR should have in the calculation of system utility"), 
+      return {InputPort<double>(WEIGHT, "How much influence this NFR should have in the calculation of system utility"), 
               InputPort<float>("in_voltage","voltage"),
               InputPort<float>("in_temperature","temperature"),
               InputPort<float>("in_current","current"),
@@ -271,7 +282,7 @@ class EnergyNFR : public NFRNode
               InputPort<float>("in_capacity","capacity"),
               InputPort<float>("in_design_capacity","design_capacity"),
               InputPort<float>("in_percentage","percentage"),
-              OutputPort<double>(MEASURE_NAME, "To what extent is this property fulfilled")};
+              OutputPort<double>(METRIC, "To what extent is this property fulfilled")};
     }
 
     virtual void calculate_measure() override
@@ -292,7 +303,7 @@ class EnergyNFR : public NFRNode
       getInput("in_design_capacity",design_capacity);
       getInput("in_percentage",percentage);
 
-      std::cout << "\n x from within the NFR emergy" << voltage << "\n" << std::endl;
+      //std::cout << "\n x from within the NFR emergy" << voltage << "\n" << std::endl;
 
       // counter += 1;
       // if((some_objects.object_detected == true) && (some_objects.stamp != last_timestamp))
@@ -337,7 +348,6 @@ class EnergyNFR : public NFRNode
 
 
     }
-    static constexpr const char* MEASURE_NAME = "mission_metric";
 
 
 
