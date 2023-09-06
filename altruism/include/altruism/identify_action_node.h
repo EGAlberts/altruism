@@ -35,7 +35,9 @@ public:
   // using RosActionNode::providedBasicPorts()
   static PortsList providedPorts()
   {
-    return providedBasicPorts({OutputPort<altruism_msgs::msg::ObjectsIdentified>("objs_identified")});
+    return providedBasicPorts({OutputPort<altruism_msgs::msg::ObjectsIdentified>("objs_identified"),
+                               OutputPort<float>("out_time_elapsed"),
+                               OutputPort<int32_t>("out_picture_rate") });
   }
 
   // This is called when the TreeNode is ticked and it should
@@ -90,8 +92,11 @@ public:
   NodeStatus onResultReceived(const WrappedResult& wr) override
   {
     std::stringstream ss;
-    ss << "ID Result received: " << wr.result->time_elapsed;
-  
+    ss << "ID Result received: " << wr.result->time_elapsed << " pic rate" << wr.result->picture_rate;
+    setOutput("out_time_elapsed", wr.result->time_elapsed); 
+    setOutput("out_picture_rate", wr.result->picture_rate); 
+
+
     RCLCPP_INFO(node_->get_logger(), ss.str().c_str());
     return NodeStatus::SUCCESS;
   }

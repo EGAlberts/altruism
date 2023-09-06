@@ -27,7 +27,7 @@
 
 #include "altruism/nfr_node.h"
 
-
+#include <fstream>
 
 
 using namespace BT;
@@ -81,12 +81,12 @@ static const char* xml_tree = R"(
   <BehaviorTree ID="Untitled">
     <Parallel failure_count="1"
               success_count="-1">
-      <EnergyNFR weight="{energy_weight}" in_voltage="{voltage}" in_temperature="{temperature}" in_current="{current}" in_charge="{charge}" in_capacity="{capacity}" in_design_capacity="{design_capacity}" in_percentage="{percentage}" metric="{energy_metric}">
+      <EnergyNFR weight="{energy_weight}" in_voltage="{voltage}" in_linear_speed="{linear_speed}" in_temperature="{temperature}" in_current="{current}" in_charge="{charge}" in_capacity="{capacity}" in_design_capacity="{design_capacity}" in_percentage="{percentage}" metric="{energy_metric}">
       <Sequence>
         <Script code="mission_weight:=1.0; current_position:=1.0; energy_weight=1.0; energy_metric:=1.0; mission_metric:=1.0" />
         <SLAMfd  rob_position="{current_position}" />
-        <MissionNFR weight="{mission_weight}" rob_position="{current_position}" objs_identified="{objects_detected}" metric="{mission_metric}" >
-          <IDfd objs_identified="{objects_detected}"/>
+        <MissionNFR weight="{mission_weight}" rob_position="{current_position}" objs_identified="{objects_detected}" metric="{mission_metric}" mean_metric="{mission_mean_metric}" >
+          <IDfd objs_identified="{objects_detected}" out_time_elapsed="{id_time_elapsed}" out_picture_rate="{id_picture_rate}"/>
         </MissionNFR>
       </Sequence>
       </EnergyNFR>
@@ -146,6 +146,8 @@ public:
   using NFR_MSG = altruism_msgs::msg::NFR;
   using BTAction = altruism_msgs::action::BehaviorTree;
   using GoalHandleBTAction = rclcpp_action::ServerGoalHandle<BTAction>;
+  const std::string MSN_MAX_OBJ_PS_NAME = "max_objects_per_second";
+  const std::string MSN_WINDOW_LEN_NAME = "mission_qa_window";
 
   BT::Tree tree;
   BehaviorTreeFactory factory;
@@ -157,7 +159,7 @@ public:
       _get_nfr = this->create_service<GetNFR>("get_nfr", std::bind(&Arborist::handle_get_nfr, this, _1, _2));
       _set_weights = this->create_service<SetWeights>("set_weights", std::bind(&Arborist::handle_set_weights, this, _1, _2));
 
-
+      
 
       //_start_tree = this->create_service<SetBlackboard>("set_blackboard", std::bind(&Arborist::handle_set_bb, this, _1, _2));
       _start_tree = rclcpp_action::create_server<BTAction>(
@@ -175,9 +177,26 @@ public:
       factory.registerNodeType<MissionCompleteNFR>("MissionNFR");
       factory.registerNodeType<EnergyNFR>("EnergyNFR");
 
-
-
       tree = factory.createTreeFromText(xml_tree);
+
+      this->declare_parameter(MSN_MAX_OBJ_PS_NAME, 1);
+      this->declare_parameter(MSN_WINDOW_LEN_NAME, 20);
+
+      int max_objs_ps = this->get_parameter(MSN_MAX_OBJ_PS_NAME).as_int();
+      int window_length = this->get_parameter(MSN_WINDOW_LEN_NAME).as_int();
+
+
+      auto mission_visitor = [max_objs_ps, window_length](TreeNode* node)
+      {
+        if (auto mission_nfr_node = dynamic_cast<MissionCompleteNFR*>(node))
+        {
+          mission_nfr_node->initialize(max_objs_ps,
+                                       window_length);
+        }
+      };
+
+      // Apply the visitor to ALL the nodes of the tree
+      tree.applyVisitor(mission_visitor);
   }
 
   template <class T>
@@ -241,7 +260,7 @@ private:
     const std::string sought_key = request->key_name;
 
     std::cout << "sought key" << sought_key << std::endl;
-
+    //this get isn't safe for the value not being assigned yet..
     auto entry_value = tree.rootBlackboard()->get<std::string>(sought_key);
 
     std::cout << "the value is " << entry_value << " gotten from the bb " << std::endl;
@@ -249,16 +268,30 @@ private:
     response->key_value = entry_value;
   }
 
-  std::vector<TreeNode::Ptr> get_tree_nfrs()
+  std::vector<NFRNode*> get_tree_nfrs()
   {    
-    std::vector<TreeNode::Ptr> nfr_nodes;
-    for (auto & sbtree : tree.subtrees) 
+    std::vector<NFRNode*> nfr_nodes;
+
+    // auto visitor = [nfr_nodes](TreeNode* node)
+    // {
+    //   if (auto nfr_node = dynamic_cast<NFRNode*>(node))
+    //   {
+    //     std::cout << "This new thing worked and I found the following node " << nfr_node->registrationName() << std::endl;
+    //     nfr_nodes.push_back(nfr_node);
+
+    //     //action_B_node->initialize(69, "interesting_value");
+    //   }
+    // };
+
+    // // Apply the visitor to ALL the nodes of the tree
+    // tree.applyVisitor(visitor);
+    for (auto const & sbtree : tree.subtrees) 
     {
       for (auto & node : sbtree->nodes) 
       {
-        if(node->type() == NodeType::DECORATOR && (node->registrationName().find("NFR") != std::string::npos))
+        if(auto nfr_node = dynamic_cast<NFRNode*>(static_cast<TreeNode*>(node.get())))
         {
-          nfr_nodes.push_back(node);
+          nfr_nodes.push_back(nfr_node);
         }
       }
     }
@@ -388,6 +421,35 @@ private:
           }
           goal_handle->succeed(result);
           RCLCPP_INFO(this->get_logger(), "Goal finished: Done ticking the tree");
+          
+          //Reporting on mission
+          float id_time_elapsed = tree.rootBlackboard()->get<float>("id_time_elapsed");
+          float id_picture_rate = tree.rootBlackboard()->get<float>("id_picture_rate");
+          float avg_mission_metric = tree.rootBlackboard()->get<float>("mission_mean_metric");
+
+          
+          auto curr_time_pointer = std::chrono::system_clock::now();
+          int current_time = std::chrono::duration_cast<std::chrono::seconds>(curr_time_pointer.time_since_epoch()).count();
+
+          // file pointer
+          std::fstream fout;
+        
+          // opens an existing csv file or creates a new file.
+          fout.open("altruism_results.csv", std::ios::out | std::ios::app);
+        
+          //Header
+          // fout << "timestamp" << ", " 
+          //     << "picture_rate" << ", "
+          //     << "time_elapsed" << "\n";
+
+          // Insert the data to file
+          fout << current_time << ", " 
+              << id_picture_rate << ", "
+               << avg_mission_metric << ", "
+              << id_time_elapsed << "\n";
+            
+          fout.close();
+
           break;
         }
 
@@ -428,14 +490,10 @@ private:
   rclcpp::Service<GetNFR>::SharedPtr _get_nfr;
   rclcpp::Service<SetWeights>::SharedPtr _set_weights;
 
-
-
-  rclcpp_action::Server<BTAction>::SharedPtr _start_tree;
-
-  
-    
-    
+  rclcpp_action::Server<BTAction>::SharedPtr _start_tree; 
 };
+
+
 
 
 int main(int argc, char * argv[])

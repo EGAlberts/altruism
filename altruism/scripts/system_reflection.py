@@ -13,6 +13,9 @@ from collections import deque
 #published data about the system.
 import time
 import threading
+from nav_msgs.msg import Odometry
+import numpy as np
+
 class SystemReflection(Node):
     
     def __init__(self):
@@ -23,9 +26,11 @@ class SystemReflection(Node):
         timer_cb_group = MutuallyExclusiveCallbackGroup()
         exclusive_group = MutuallyExclusiveCallbackGroup()
         sub_group = MutuallyExclusiveCallbackGroup()
-
+        self.counter = 0
         self.cli = self.create_client(SetBlackboard, '/set_blackboard', callback_group=exclusive_group)
         self.subscription = self.create_subscription(BatteryState,'/battery/status',self.battery_state_cb,10, callback_group=sub_group)
+        self.odometry_subscription = self.create_subscription(Odometry,'/odom',self.tb_odom_cb,10, callback_group = MutuallyExclusiveCallbackGroup())
+        
         self.req = SetBlackboard.Request()
 
         self.time_monitor_timer = self.create_timer(2, self.do_stuff, callback_group=timer_cb_group)
@@ -45,6 +50,12 @@ class SystemReflection(Node):
             # return self.future.result()
         
     
+    def tb_odom_cb(self,msg):
+        self.linear_speed = np.hypot(msg.twist.twist.linear.x, msg.twist.twist.linear.y)
+        self.counter+=1
+        if(self.counter % 1000 == 0): self.get_logger().info('1000th Odom Msg Received!!')
+        if self.counter > 200000: self.counter = 0
+
     def battery_state_cb(self,msg):
         self.state_queue.append(msg)
 
@@ -63,6 +74,17 @@ class SystemReflection(Node):
             
             self.battery_state = None
 
+    
+    def script_string(self, field, value):
+        assignment_string = ""
+        assignment_string+= field
+        assignment_string+= ":="
+        if type(value) == str:
+            assignment_string+= "'" + value + "'"
+        else:
+            assignment_string+= str(value)
+            assignment_string+= "; "
+        return assignment_string
         
 
     def process_bt_state(self):
@@ -74,20 +96,15 @@ class SystemReflection(Node):
         #float32 design_capacity  # Capacity in Ah (design capacity)  (If unmeasured NaN)
         #float32 percentage       # Charge percentage on 0 to 1 range  (If unmeasured NaN)
         
+        #float32 linear_speed 
         try:
             bt_state = self.state_queue[-1]
             assignment_string = ""
             fields = ["voltage", "temperature", "current", "charge", "capacity", "design_capacity", "percentage"] #paramterize?
             for field in fields:
-                assignment_string+= field
-                assignment_string+= ":="
-                value = getattr(bt_state,field) #same as doing bt_state.voltage etc. etc.
-                if type(value) == str:
-                    assignment_string+= "'" + value + "'"
-                else:
-                    assignment_string+= str(value)
-                assignment_string+= "; "
-            
+                assignment_string += self.script_string(field, getattr(bt_state,field))
+
+            assignment_string+= self.script_string("linear_speed", self.linear_speed)
             assignment_string = assignment_string[:-2]
             return assignment_string
         except IndexError:

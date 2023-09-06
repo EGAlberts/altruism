@@ -23,9 +23,16 @@ from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
-
+from launch.actions import DeclareLaunchArgument
+from launch.conditions import LaunchConfigurationEquals
 
 def generate_launch_description():
+
+    gui_arg = DeclareLaunchArgument(
+        'gui',
+        default_value='true',
+        description='Run with gui (true/false)')
+    
     launch_file_dir = os.path.join(get_package_share_directory('turtlebot3_gazebo'), 'launch')
     pkg_gazebo_ros = get_package_share_directory('gazebo_ros')
 
@@ -39,6 +46,8 @@ def generate_launch_description():
         'dark_world.world'
     )
 
+
+
     gzserver_cmd = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(pkg_gazebo_ros, 'launch', 'gzserver.launch.py')
@@ -48,8 +57,9 @@ def generate_launch_description():
 
     gzclient_cmd = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
-            os.path.join(pkg_gazebo_ros, 'launch', 'gzclient.launch.py')
-        )
+            os.path.join(pkg_gazebo_ros, 'launch', 'gzclient.launch.py')),
+            condition=LaunchConfigurationEquals('gui', 'true')
+        
     )
 
     robot_state_publisher_cmd = IncludeLaunchDescription(
@@ -69,13 +79,12 @@ def generate_launch_description():
         }.items()
     )
 
-    ld = LaunchDescription()
+    return LaunchDescription(
+        [gzserver_cmd, gzclient_cmd, robot_state_publisher_cmd, spawn_turtlebot_cmd, gui_arg]
+    )
 
     # Add the commands to the launch description
-    ld.add_action(gzserver_cmd)
-    ld.add_action(gzclient_cmd)
-    ld.add_action(robot_state_publisher_cmd)
-    ld.add_action(spawn_turtlebot_cmd)
 
-    return ld
+
+
 

@@ -44,7 +44,8 @@ public:
   NFRNode(const std::string& name, const NodeConfig& config) : DecoratorNode(name, config)
   {
     std::cout << "Someone made me (an NFR node) \n\n\n\n\n\n" << std::endl;
-
+    _average_metric = 0.0;
+    _times_calculated = 0;
     // if (!getInput(WEIGHT, weight_))
     // {
     //   throw RuntimeError("Missing parameter [", WEIGHT, "] in NFRNode");
@@ -60,6 +61,8 @@ public:
 
   //Name for the metric input port
   static constexpr const char* METRIC = "metric";
+  static constexpr const char* MEAN_METRIC = "mean_metric";
+
 
   static constexpr const char* PROPERTY_NAME = "property_name";
   
@@ -69,7 +72,6 @@ public:
 private:
   int weight_;
   std::string property_name_;
-  
   NonFunctionalProperty prop_type;
   bool read_parameter_from_ports_;
   static std::map<std::string, NonFunctionalProperty> s_mapNFPs;
@@ -122,7 +124,21 @@ private:
     std::cout << "Here's where I would calculate a measure... if I had one" << std::endl;
   }
 
+
   //void halt() override;
+
+  protected:
+    int _times_calculated;
+    double _average_metric;
+    double _metric;
+
+    void metric_mean()
+    {
+      double new_average = _average_metric + ((_metric - _average_metric) / (double)_times_calculated);
+      _average_metric = new_average;
+    }
+
+
 };
 
 class SafetyNFR : public NFRNode
@@ -154,92 +170,91 @@ class SafetyNFR : public NFRNode
 class MissionCompleteNFR : public NFRNode
 {
   public:
-    int counter;
-    double detection_threshold; 
-    std::string goal_object;
-    double times_detected;
-    builtin_interfaces::msg::Time last_timestamp;
-    double max_detected;
-    int detected_in_window;
-    int window_length;
-    int window_start;
     MissionCompleteNFR(const std::string& name, const NodeConfig& config) : NFRNode(name, config)
     {
       std::cout << "Someone made me (a MissionComplete NFR node) \n\n\n\n\n\n" << std::endl;
-      counter = 0;
-      window_length = 20;
-      detection_threshold = 10; //how many times the object needs to be found in a given position to be confirmed to be there.
-      max_detected = 1 * window_length; //What we presume is the max number of objects that'll be detected in a 20 second window.
-      //TODO: make this a parameter.
-      goal_object = "fire hydrant";
-      times_detected = 0; //Also should be a parameter somehow.
-      detected_in_window = 0.0;
-      window_start = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-      
+      _counter = 0;
 
+      _detected_in_window = 0.0;
+      _window_start = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+
+      _last_timestamp = builtin_interfaces::msg::Time();
+  
     }
+
+    void initialize(int max_objs_ps, int window_length)
+    {
+        _max_object_ps = max_objs_ps;
+        _window_length = window_length;
+
+        _max_detected = _max_object_ps * _window_length; //What we presume is the max number of objects that'll be detected in a 20 second window.
+    }
+
 
     static PortsList providedPorts()
     {
       return {InputPort<double>(WEIGHT, "How much influence this NFR should have in the calculation of system utility"), 
               InputPort<geometry_msgs::msg::PoseStamped>("rob_position","Robot's current position"),
               InputPort<altruism_msgs::msg::ObjectsIdentified>("objs_identified","The objects detected through the robot's camera"),
-              OutputPort<double>(METRIC, "To what extent is this property fulfilled")};
+              OutputPort<double>(METRIC, "To what extent is this property fulfilled"),
+              OutputPort<double>(MEAN_METRIC, "To what extent is this property fulfilled on average")};
+              
     }
 
     virtual void calculate_measure() override
     {
-      geometry_msgs::msg::PoseStamped some_pose; //probably won't be used after all..
-      altruism_msgs::msg::ObjectsIdentified some_objects;
-      //std::cout << "Here's where I calculate a MissionCompleteness measure" << std::endl;
-      getInput("rob_position", some_pose);
-      getInput("objs_identified", some_objects);
+      altruism_msgs::msg::ObjectsIdentified objects_msg;
 
-      counter += 1;
-      if((some_objects.object_detected == true) && (some_objects.stamp != last_timestamp))
+      getInput("objs_identified", objects_msg);
+
+      _counter += 1;
+      if((objects_msg.object_detected == true) && (objects_msg.stamp != _last_timestamp))
       {
-        // if(std::find(some_objects.object_names.begin(), some_objects.object_names.end(), goal_object) != std::end(some_objects.object_names)){
-        //   times_detected += 1;
-        //   last_timestamp = some_objects.stamp;
-        // }
-        detected_in_window += some_objects.object_names.size();
-        last_timestamp = some_objects.stamp;
+        _detected_in_window += objects_msg.object_names.size();
+        _last_timestamp = objects_msg.stamp;
       }
 
-      //double detection_ratio = times_detected / detection_threshold;
-      double detection_ratio = (double)detected_in_window / max_detected;
+      _metric = (double)_detected_in_window / _max_detected;
 
       auto curr_time_pointer = std::chrono::system_clock::now();
       
       int current_time = std::chrono::duration_cast<std::chrono::seconds>(curr_time_pointer.time_since_epoch()).count();
-      int elapsed_seconds = current_time-window_start;
-      if(elapsed_seconds >= window_length)
+      int elapsed_seconds = current_time-_window_start;
+      if(elapsed_seconds >= _window_length)
       {
-        setOutput(METRIC,std::min(detection_ratio,1.0));
-        window_start = current_time;
-        detected_in_window = 0;
+        setOutput(METRIC,std::min(_metric,1.0));
+        _times_calculated++; 
+        metric_mean();
+        std::cout << "the mean metric " << _average_metric << std::endl;
+        setOutput(MEAN_METRIC,_average_metric);
+        _window_start = current_time;
+        _detected_in_window = 0;
+
       }
-      if((counter % 10000) == 0) {
-        std::cout << "\n x from within the NFR mission completeness" << some_pose.pose.position.x << "\n" << std::endl;
-        std::cout << "\n obj_id bool from within the NFR mission completeness" << some_objects.object_detected << "\n" << std::endl;
-        if(some_objects.object_detected == true)
+      if((_counter % 10000) == 0) {
+        std::cout << "\n obj_id bool from within the NFR mission completeness" << objects_msg.object_detected << "\n" << std::endl;
+        if(objects_msg.object_detected == true)
         {
-          for (auto i: some_objects.object_names) std::cout << i << ' ';
+          for (auto i: objects_msg.object_names) std::cout << i << ' ';
         }
-        std::cout << "\n detection_ratio " << detection_ratio << "\n" << std::endl;
-        std::cout << "\n detected_in_window " << detected_in_window << "\n" << std::endl;
+        std::cout << "\n detection_ratio " << _metric << "\n" << std::endl;
+        std::cout << "\n detected_in_window " << _detected_in_window << "\n" << std::endl;
 
 
 
-        counter = 0;
+        _counter = 0;
       }
-
-
-
 
     }
 
-
+    private:
+      int _detected_in_window;
+      builtin_interfaces::msg::Time _last_timestamp;
+      double _max_detected;
+      int _max_object_ps;
+      int _window_length;
+      int _window_start;
+      int _counter;
 
 };
 
@@ -282,6 +297,8 @@ class EnergyNFR : public NFRNode
               InputPort<float>("in_capacity","capacity"),
               InputPort<float>("in_design_capacity","design_capacity"),
               InputPort<float>("in_percentage","percentage"),
+              InputPort<float>("in_linear_speed","linear_speed"),
+
               OutputPort<double>(METRIC, "To what extent is this property fulfilled")};
     }
 
@@ -294,6 +311,7 @@ class EnergyNFR : public NFRNode
       float capacity;
       float design_capacity;
       float percentage;
+      float linear_speed;
       //std::cout << "Here's where I calculate a MissionCompleteness measure" << std::endl;
       getInput("in_voltage",voltage);
       getInput("in_temperature",temperature);
@@ -302,8 +320,10 @@ class EnergyNFR : public NFRNode
       getInput("in_capacity",capacity);
       getInput("in_design_capacity",design_capacity);
       getInput("in_percentage",percentage);
+      getInput("in_linear_speed",linear_speed);
 
-      //std::cout << "\n x from within the NFR emergy" << voltage << "\n" << std::endl;
+
+      //std::cout << "\n x from within the NFR energy speed " << linear_speed << "\n" << std::endl;
 
       // counter += 1;
       // if((some_objects.object_detected == true) && (some_objects.stamp != last_timestamp))

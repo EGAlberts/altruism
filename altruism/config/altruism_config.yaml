@@ -1,0 +1,10 @@
+/identify_action_server:
+  ros__parameters:
+    pic_rate: 3
+    goal_obj: "fire hydrant"
+    det_threshold: 30
+
+/arborist_node:
+  ros__parameters:
+    max_objects_per_second: 1
+    mission_qa_window: 20

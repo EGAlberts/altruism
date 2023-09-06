@@ -53,6 +53,7 @@ install(PROGRAMS
 install(DIRECTORY
   launch
   worlds
+  config
   DESTINATION share/${PROJECT_NAME}/
 )
 

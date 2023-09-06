@@ -18,6 +18,10 @@ import numpy as np
 from geometry_msgs.msg import PoseStamped
 import math
 
+
+PICTURE_RT_PARAM = "pic_rate"
+GOAL_OBJ_NAME_PARAM = "goal_obj"
+DET_THRESH_PARAM = "det_threshold"
 #GPT
 def explore_group(row, col, group, visited, grid):
     rows, columns = grid.shape
@@ -89,9 +93,18 @@ class IdentifyActionServer(Node):
             self.execute_callback,
             callback_group=MutuallyExclusiveCallbackGroup())
         
+        self.declare_parameter(GOAL_OBJ_NAME_PARAM, "fire hydrant")
+        self.declare_parameter(PICTURE_RT_PARAM, 5)
+        self.declare_parameter(DET_THRESH_PARAM,50)
+        
+
+        
         self.check_obj_acclient = ActionClient(self, CheckForObjects, 'checkForObjectsActionName', callback_group = MutuallyExclusiveCallbackGroup())
         print(type(self.check_obj_acclient))
+        
+
         self.subscription = self.create_subscription(Image,'/camera/image_raw',self.tb_image_cb,10, callback_group = MutuallyExclusiveCallbackGroup())
+        
         self.tb_image = None
         self.map = None
         self.counter = 0
@@ -107,9 +120,9 @@ class IdentifyActionServer(Node):
         #float32 probability
         self.get_logger().info('ID Action server created...')
 
-        self.picture_rate = 5 #parameterize
-        self.detection_threshold = 50 #parameterize
-        self.goal_object = 'fire hydrant'
+        self.picture_rate = self.get_parameter(PICTURE_RT_PARAM).get_parameter_value().integer_value #parameterize
+        self.detection_threshold = self.get_parameter(DET_THRESH_PARAM).get_parameter_value().integer_value #parameterize
+        self.goal_object = self.get_parameter(GOAL_OBJ_NAME_PARAM).get_parameter_value().string_value
 
         self.nav_to_pose_client = ActionClient(self, NavigateToPose, 'navigate_to_pose')
 
@@ -119,7 +132,7 @@ class IdentifyActionServer(Node):
     def tb_image_cb(self,msg):
         self.tb_image = msg
         self.counter+=1
-        if(self.counter % 1000 == 0): self.get_logger().info('1000th Msg Received!!')
+        if(self.counter % 1000 == 0): self.get_logger().info('1000th Image Msg Received!!')
         if self.counter > 200000: self.counter = 0
 
 
@@ -153,14 +166,20 @@ class IdentifyActionServer(Node):
 
         self.result_future = self.goal_handle.get_result_async()
         rclpy.spin_until_future_complete(self, self.result_future,timeout_sec=20)
+        
+        #self.get_logger().info('NavToPose result error code: ' + str(self.result_future.result().result.error_code)) this should work in a future release of nav2
+
+        
+
         return True
     
+
     def execute_callback(self, goal_handle):
         self.get_logger().info('Executing goal...')
 
         self.get_logger().info('Its me, hi, Im a ID action server')
         self.map = goal_handle.request.map
-        self.get_logger().info('Mepp height: {2} width: {1} data: {0}'.format(self.map.data, self.map.info.width, self.map.info.height))
+        self.get_logger().info('Mepp height: {1} width: {0}'.format(self.map.info.width, self.map.info.height))
 
 
         map_rows = [self.map.data[x:x+self.map.info.width] for x in range(0, len(self.map.data), self.map.info.width)]
@@ -168,28 +187,45 @@ class IdentifyActionServer(Node):
         #ASSERT len(chunks) == height
 
         map_as_array = np.array(map_rows)
+        # Crucially the notion of 0,0 are upside down, 
+        map_as_array = np.flipud(map_as_array)
+        #So I make it so indexing matches up and down of robot.
 
-        obstacles = find_groups(map_as_array)
+        # for row in map_as_array:
+        #     self.get_logger().info(str(row))
+
+
+
+        obstacles = find_groups(map_as_array) #this contains the rows, col of each obstacles
+        # Altough 0,0 may match here, the x and y are flipped, because if I do obstacles[0] I get the row while in x,y the x coord is the column.
+        #the row, col needs to become x,y. 
+        
+        # the matrix' 0,0 is the top left while the 0,0 (x,y) for the robot and map is bottom left.
+        #
+
+
+
         origin_x, origin_y = [self.map.info.origin.position.x, self.map.info.origin.position.y]
         for obstacle in obstacles: #convert from cells (grid representation) to actual meters
             for pt in obstacle:
-                self.get_logger().info('origin x : {1} resolution: {0} pt[0]: {2} '.format(origin_x, self.map.info.resolution, pt[0]))
-                self.get_logger().info('origin y : {1} resolution: {0} pt[1]: {2} '.format(origin_y, self.map.info.resolution, pt[1]))
+                #self.get_logger().info('origin x : {1} resolution: {0} pt[0]: {2} '.format(origin_x, self.map.info.resolution, pt[0]))
+                #self.get_logger().info('origin y : {1} resolution: {0} pt[1]: {2} '.format(origin_y, self.map.info.resolution, pt[1]))
                 
-                pt[0] = origin_x + ( (pt[0]*self.map.info.resolution) + (self.map.info.resolution/2))
-                pt[1] = origin_y + ( (pt[1]*self.map.info.resolution) + (self.map.info.resolution/2))
+                #0 is the rows, 1 is the columns, which is reverse of x,y
+                pt[1] = origin_x + ( (pt[1]*self.map.info.resolution) + (self.map.info.resolution/2))
+                pt[0] = origin_y + ( (pt[0]*self.map.info.resolution) + (self.map.info.resolution/2))
 
-                self.get_logger().info('pt[0]: {0} pt[1]: {1} '.format(pt[0], pt[1]))
+                #self.get_logger().info('pt[0]: {0} pt[1]: {1} '.format(pt[0], pt[1]))
 
         points_to_visit = []
 
         for obstacle in obstacles:
             all_the_ys = [pt[0] for pt in obstacle] 
             all_the_xs = [pt[1] for pt in obstacle]
-            #I discovered that somewhere along the way the x and y got flipped so I remedy it here.
+            #Once again as the pt's are in row,col this is the reverse of x,y so we handle them in reverse.
             horizontal_middle = (max(all_the_ys) + min(all_the_ys)) / 2
             vertical_bottom = min(all_the_xs)
-            points_to_visit.append([vertical_bottom - 0.2, horizontal_middle, 0.785398163]) #the 0.2 is so the robot is a bit below and doesn't collide with the obstacle
+            points_to_visit.append([vertical_bottom - 0.2, -horizontal_middle, 0.0]) #the 0.2 is so the robot is a bit below and doesn't collide with the obstacle
 
 
         route_poses = []
@@ -206,6 +242,10 @@ class IdentifyActionServer(Node):
             pose.pose.orientation.z = q[2]
             pose.pose.orientation.w = q[3]
             route_poses.append(deepcopy(pose))
+        
+        self.get_logger().info("the poses:")
+        self.get_logger().info(str(route_poses))
+        self.get_logger().info("\n\n")
 
         self.obstacle_visiting_loop = cycle(route_poses)
         #find the average y and the lowest x, send the robot to a bit below that each time and after you reach it you identify it?? but this defeats our adaptation :(
@@ -216,7 +256,8 @@ class IdentifyActionServer(Node):
 
             self.goToPose(next(self.obstacle_visiting_loop, None))
             #time.sleep(self.picture_rate)        
-
+            self.picture_rate = self.get_parameter(PICTURE_RT_PARAM).get_parameter_value().integer_value #parameterize
+            
             for i in range(self.picture_rate):
                 #take a picture
                 while self.prev_done is False:
@@ -236,6 +277,7 @@ class IdentifyActionServer(Node):
         goal_handle.succeed()
         res = Identify.Result()
         res.time_elapsed = time.time() - self.initial_time
+        res.picture_rate = self.picture_rate
         return res
 
     def visit_obstacle(self, obstacle):
