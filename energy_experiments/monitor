@@ -1,0 +1,5 @@
+#!/bin/bash
+
+powerstat -R &
+./darknet detect cfg/yolov3.cfg yolov3.weights data/dog.jpg >/dev/null 2>&1
+kill -2 $!
