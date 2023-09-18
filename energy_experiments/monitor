@@ -1,5 +1,18 @@
 #!/bin/bash
+declare -a files=("dog" "eagle" "kite" "person" "scream" "horses")
 
-powerstat -R &
-./darknet detect cfg/yolov3.cfg yolov3.weights data/dog.jpg >/dev/null 2>&1
-kill -2 $!
+cnt=0
+for i in {1..10};
+do
+  for f in $(shuf -e "${files[@]}");
+  do
+    dir_name="${f}_run_${cnt}"
+    echo $dir_name
+    mkdir experiments/$dir_name
+    powerstat -R > experiments/$dir_name/power.txt 2>&1 &
+    ./darknet detect cfg/yolov3.cfg yolov3.weights data/$f.jpg > experiments/$dir_name/out.txt 2>&1
+    kill -2 $!
+    sleep 60
+    cnt=$((cnt+1))
+  done
+done
