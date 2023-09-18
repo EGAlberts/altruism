@@ -1,0 +1,12 @@
+<root BTCPP_format="4">
+  <BehaviorTree ID="Untitled">
+      <Parallel failure_count="1"
+              success_count="-1">
+      <EnergyNFR weight="{energy_weight}" in_voltage="{voltage}" in_linear_speed="{linear_speed}" in_temperature="{temperature}" in_current="{current}" in_charge="{charge}" in_capacity="{capacity}" in_design_capacity="{design_capacity}" in_percentage="{percentage}" metric="{energy_metric}">
+      <SLAMfd  rob_position="{current_position}" />
+      </EnergyNFR>
+      <Bandit/>
+    </Parallel>
+
+  </BehaviorTree>
+</root>

@@ -1,0 +1,16 @@
+<root BTCPP_format="4">
+  <BehaviorTree ID="Untitled">
+    <Parallel failure_count="1"
+              success_count="-1">
+      <EnergyNFR weight="{energy_weight}" in_voltage="{voltage}" in_linear_speed="{linear_speed}" in_temperature="{temperature}" in_current="{current}" in_charge="{charge}" in_capacity="{capacity}" in_design_capacity="{design_capacity}" in_percentage="{percentage}" metric="{energy_metric}">
+      <Sequence>
+        <Script code="mission_weight:=1.0; current_position:=1.0; energy_weight=1.0; energy_metric:=1.0; mission_metric:=1.0" />
+        <MissionNFR weight="{mission_weight}" rob_position="{current_position}" objs_identified="{objects_detected}" metric="{mission_metric}" mean_metric="{mission_mean_metric}" >
+          <IDfd objs_identified="{objects_detected}" out_time_elapsed="{id_time_elapsed}" out_picture_rate="{id_picture_rate}" variable_parameters="{id_var_params}"/>
+        </MissionNFR>
+      </Sequence>
+      </EnergyNFR>
+      <Bandit/>
+    </Parallel>
+  </BehaviorTree>
+</root>

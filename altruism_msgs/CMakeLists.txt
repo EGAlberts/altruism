@@ -13,6 +13,7 @@ find_package(ament_cmake REQUIRED)
 find_package(builtin_interfaces REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
+find_package(rcl_interfaces REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
@@ -23,11 +24,15 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/SetBlackboard.srv"
   "srv/GetBlackboard.srv"
   "srv/GetNFR.srv"
+  "srv/GetVariableParams.srv"
   "srv/SetWeights.srv"
   "msg/ObjectsIdentified.msg"
   "msg/NFR.msg"
+  "msg/VariableParameter.msg"
+  "msg/VariableParameters.msg"
 
-  DEPENDENCIES builtin_interfaces geometry_msgs nav_msgs
+
+  DEPENDENCIES builtin_interfaces geometry_msgs nav_msgs rcl_interfaces
 )
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

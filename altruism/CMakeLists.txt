@@ -54,6 +54,7 @@ install(DIRECTORY
   launch
   worlds
   config
+  trees
   DESTINATION share/${PROJECT_NAME}/
 )
 

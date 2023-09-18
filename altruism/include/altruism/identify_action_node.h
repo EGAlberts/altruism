@@ -8,25 +8,49 @@
 #include "behaviortree_ros2/bt_action_node.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "altruism_msgs/action/identify.hpp"
+#include "altruism_msgs/msg/variable_parameter.hpp"
+
 #include "altruism_msgs/msg/objects_identified.hpp"
 #include "nav_msgs/srv/get_map.hpp"
-
+#include "altruism/variable_action_node.h"
 
 using namespace BT;
 
 
 using ID = altruism_msgs::action::Identify;
+using VariableParam = altruism_msgs::msg::VariableParameter;
 
-class IdentifyAction: public RosActionNode<ID>
+
+class IdentifyAction: public VariableActionNode<ID>
 {
 public:
+  
+  const std::string PICTURE_RT_PARAM = "pic_rate";
+
   IdentifyAction(const std::string& name,
                   const NodeConfig& conf,
                   const RosNodeParams& params)
-    : RosActionNode<ID>(name, conf, params)
+    : VariableActionNode<ID>(name, conf, params)
   {
     std::cout << "Someone made me (an ID Action Node) \n\n\n\n\n\n" << std::endl;
+    
+    _var_params = VariableParameters();
 
+    VariableParam picture_rate_param = VariableParam();
+
+    picture_rate_param.name = PICTURE_RT_PARAM;
+    int pc_rate_values[4] = {1,3,5,7};
+
+    for (int val : pc_rate_values) {
+      ParamValue possible_value = ParamValue();
+      possible_value.type = 2; //integer type
+      possible_value.integer_value = val;
+      picture_rate_param.possible_values.push_back(possible_value);
+    }
+
+    _var_params.variable_parameters.push_back(picture_rate_param); //vector of VariableParameter
+    
+    setOutput(VARIABLE_PARAMS, _var_params);
 
   }
 
@@ -35,28 +59,57 @@ public:
   // using RosActionNode::providedBasicPorts()
   static PortsList providedPorts()
   {
-    return providedBasicPorts({OutputPort<altruism_msgs::msg::ObjectsIdentified>("objs_identified"),
-                               OutputPort<float>("out_time_elapsed"),
-                               OutputPort<int32_t>("out_picture_rate") });
+    PortsList base_ports = VariableActionNode::providedPorts();
+
+    PortsList child_ports = { 
+              OutputPort<altruism_msgs::msg::ObjectsIdentified>("objs_identified"),
+              OutputPort<float>("out_time_elapsed"),
+              OutputPort<int32_t>("out_picture_rate") 
+            };
+
+    child_ports.merge(base_ports);
+
+    return child_ports;
   }
 
   // This is called when the TreeNode is ticked and it should
   // send the request to the action server
-  bool setGoal(RosActionNode::Goal& goal) override 
+  bool setGoal(VariableActionNode::Goal& goal) override 
   {
 
-    rclcpp::Client<nav_msgs::srv::GetMap>::SharedPtr client = node_->create_client<nav_msgs::srv::GetMap>("/slam_toolbox/dynamic_map");
+    rclcpp::Client<nav_msgs::srv::GetMap>::SharedPtr slam_get_mapclient = node_->create_client<nav_msgs::srv::GetMap>("/slam_toolbox/dynamic_map");
+    rclcpp::Client<nav_msgs::srv::GetMap>::SharedPtr noslam_get_mapclient = node_->create_client<nav_msgs::srv::GetMap>("/map_server/map");
+
+    rclcpp::Client<nav_msgs::srv::GetMap>::SharedPtr client;
     std::string some_text;
 
     auto request = std::make_shared<nav_msgs::srv::GetMap::Request>();
 
-    while (!client->wait_for_service(std::chrono::seconds(1))) {
-    if (!rclcpp::ok()) {
-      RCLCPP_ERROR(node_->get_logger(), "Interrupted while waiting for the service. Exiting.");
-      return 0;
+    while(true)
+    {
+      if (!rclcpp::ok()) {
+        RCLCPP_ERROR(node_->get_logger(), "Interrupted while waiting for the service. Exiting.");
+        return 0;
+      }
+
+      if(!slam_get_mapclient->wait_for_service(std::chrono::seconds(1)))
+      {
+        RCLCPP_INFO(node_->get_logger(), "SLAM Get map service not available, waiting again...");
+      }
+      else{
+        client = slam_get_mapclient;
+        break;
+      }
+
+      if(!noslam_get_mapclient->wait_for_service(std::chrono::seconds(1)))
+      {
+        RCLCPP_INFO(node_->get_logger(), "map server Get map service not available, waiting again...");
+      }
+      else{
+        client = noslam_get_mapclient;
+        break;
+      }
     }
-    RCLCPP_INFO(node_->get_logger(), "service not available, waiting again...");
-  }
 
   auto result = client->async_send_request(request);
   // Wait for the result.

@@ -17,6 +17,7 @@ from copy import deepcopy
 from itertools import cycle
 
 #This is just a placeholder SLAM action server. The real SLAM will happen in an action server for the real world.
+NUM_LOOPS_PARAM = "number_of_loops"
 
 def quaternion_from_euler(ai, aj, ak):
     ai /= 2.0
@@ -52,27 +53,75 @@ class SLAMActionServer(Node):
             self.execute_callback,
             callback_group=MutuallyExclusiveCallbackGroup())
         
+        self.declare_parameter(NUM_LOOPS_PARAM, 2)
+
+
+        self.number_of_loops = self.get_parameter(NUM_LOOPS_PARAM).get_parameter_value().integer_value 
+        
         #self.publisher_ = self.create_publisher(PoseStamped, '/goal_pose', 10)
         self.nav_to_pose_client = ActionClient(self, NavigateToPose, 'navigate_to_pose')
         
-        route = [
-        [-1.5, -2.5],
-        [-1.0, -2.0],
-        [-0.5, -2.0],
-        [0.0, -2.0],
-        [0.5, -2.0],
-        [1.0, -2.0],
-        [1.5, -1.5],
-        [2.0, -1.0],
-        [2.0, 0.0],
-        [2.0, 1.0 ],
-        [1.0, 2.0],
-        [-1.0, 2.0], #bottom left corner
-        [-2.0, 1.0],
-        [-1.75, 0.45],
-        [0.75, 0.45],
-        [0.75, -0.7],
-        [-2.0, -0.7]]
+        # route = [
+        # [-1.5, -2.5],
+        # [-1.0, -2.0],
+        # [-0.5, -2.0],
+        # [0.0, -2.0],
+        # [0.5, -2.0],
+        # [1.0, -2.0],
+        # [1.5, -1.5],
+        # [2.0, -1.0],
+        # [2.0, 0.0],
+        # [2.0, 1.0 ],
+        # [1.0, 2.0],
+        # [-1.0, 2.0], #bottom left corner
+        # [-2.0, 1.0],
+        # [-1.75, 0.45],
+        # [0.75, 0.45],
+        # [0.75, -0.7],
+        # [-2.0, -0.7]]
+
+        route = [[-1.32632, -0.435202],
+[-0.449529, -0.392679],
+[0.304105, -0.426419],
+[1.13164, -0.297064],
+[1.75301, 0.046258],
+[1.9793, 0.602041],
+[2.15175, 1.23583],
+[1.46466, 1.28645],
+[0.926112, 1.58885],
+[0.610937, 2.02619],
+[0.008176, 2.11805],
+[-0.548478, 2.13048],
+[-1.22344, 2.11072],
+[-1.97433, 1.93691],
+[-1.94058, 1.07688],
+[-1.2276, 0.998687],
+[-0.498543, 1.28216],
+[0.162532, 0.86461],
+[0.451672, 0.272738],
+[0.748789, -0.289008],
+[0.862938, -0.849525],
+[0.947443, -1.33883],
+[1.17158, -1.96743],
+[1.6876, -1.99342],
+[2.13854, -1.59337],
+[2.05287, -1.04661],
+[1.59542, -0.754599],
+[0.492067, -0.795598],
+[-0.306006, -0.849851],
+[-0.803373, -0.552207],
+[-1.11751, 0.140046],
+[-1.71211, -0.071969],
+[-1.95893, -0.886816],
+[-2.05245, -1.65844],
+[-1.33883, -1.85548],
+[-0.84471, -1.44798],
+[-0.270399, -1.79899],
+[0.411758, -1.87109],
+[0.752407, -1.2607],
+[0.067537, 0.02164],
+[-2.0, 0.5] #original start
+]
 
         for point_i in range(len(route)): #this is to give a more natural angle for the robot to end up at
             if(point_i == 0):
@@ -105,7 +154,7 @@ class SLAMActionServer(Node):
             route_poses.append(deepcopy(pose))
 
         self.nav2_feedback = None
-        self.route_to_follow = iter(route_poses * 2)
+        self.route_to_follow = iter(route_poses * self.number_of_loops)
         self.get_logger().info('SLAM Action server created...')
 
     
@@ -115,8 +164,6 @@ class SLAMActionServer(Node):
         self.get_logger().info('Its me, hi, Im a SLAM action server')
         goal_success = True
         while goal_success:
-            print("gonna wait 10 seconds now and then send the goal to move")
-            #time.sleep(10)        
             feedback_msg = SLAM.Feedback()
             if(self.nav2_feedback is not None):
                 feedback_msg.current_pose = self.nav2_feedback.current_pose

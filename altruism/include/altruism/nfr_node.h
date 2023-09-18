@@ -53,6 +53,13 @@ public:
 
   }
 
+  static PortsList providedPorts()
+  {
+      return {InputPort<double>(WEIGHT, "How much influence this NFR should have in the calculation of system utility"), 
+              OutputPort<double>(METRIC, "To what extent is this property fulfilled"),
+              OutputPort<double>(MEAN_METRIC, "To what extent is this property fulfilled on average")};
+  }
+
 
   virtual ~NFRNode() override = default;
 
@@ -151,8 +158,13 @@ class SafetyNFR : public NFRNode
 
     static PortsList providedPorts()
     {
-      return {InputPort<double>(WEIGHT, "How much influence this NFR should have in the calculation of system utility"), 
-      OutputPort<double>(METRIC, "To what extent is this property fulfilled")};
+      PortsList base_ports = NFRNode::providedPorts();
+
+      PortsList child_ports = {};
+
+      child_ports.merge(base_ports);
+
+      return child_ports;
     }
 
     virtual void calculate_measure() override
@@ -182,7 +194,7 @@ class MissionCompleteNFR : public NFRNode
   
     }
 
-    void initialize(int max_objs_ps, int window_length)
+    void initialize(double max_objs_ps, int window_length)
     {
         _max_object_ps = max_objs_ps;
         _window_length = window_length;
@@ -193,12 +205,14 @@ class MissionCompleteNFR : public NFRNode
 
     static PortsList providedPorts()
     {
-      return {InputPort<double>(WEIGHT, "How much influence this NFR should have in the calculation of system utility"), 
+      PortsList base_ports = NFRNode::providedPorts();
+
+      PortsList child_ports =  { 
               InputPort<geometry_msgs::msg::PoseStamped>("rob_position","Robot's current position"),
-              InputPort<altruism_msgs::msg::ObjectsIdentified>("objs_identified","The objects detected through the robot's camera"),
-              OutputPort<double>(METRIC, "To what extent is this property fulfilled"),
-              OutputPort<double>(MEAN_METRIC, "To what extent is this property fulfilled on average")};
-              
+              InputPort<altruism_msgs::msg::ObjectsIdentified>("objs_identified","The objects detected through the robot's camera")};
+      child_ports.merge(base_ports);
+
+      return child_ports;
     }
 
     virtual void calculate_measure() override
@@ -251,7 +265,7 @@ class MissionCompleteNFR : public NFRNode
       int _detected_in_window;
       builtin_interfaces::msg::Time _last_timestamp;
       double _max_detected;
-      int _max_object_ps;
+      double _max_object_ps;
       int _window_length;
       int _window_start;
       int _counter;
@@ -288,8 +302,9 @@ class EnergyNFR : public NFRNode
 
     static PortsList providedPorts()
     {
+      PortsList base_ports = NFRNode::providedPorts();
 
-      return {InputPort<double>(WEIGHT, "How much influence this NFR should have in the calculation of system utility"), 
+      PortsList child_ports = { 
               InputPort<float>("in_voltage","voltage"),
               InputPort<float>("in_temperature","temperature"),
               InputPort<float>("in_current","current"),
@@ -297,9 +312,11 @@ class EnergyNFR : public NFRNode
               InputPort<float>("in_capacity","capacity"),
               InputPort<float>("in_design_capacity","design_capacity"),
               InputPort<float>("in_percentage","percentage"),
-              InputPort<float>("in_linear_speed","linear_speed"),
+              InputPort<float>("in_linear_speed","linear_speed")};
 
-              OutputPort<double>(METRIC, "To what extent is this property fulfilled")};
+      child_ports.merge(base_ports);
+
+      return child_ports;
     }
 
     virtual void calculate_measure() override

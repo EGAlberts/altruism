@@ -53,6 +53,9 @@ def main(args=None):
 
     rclpy.spin(action_client)
 
+    action_client.destroy_node()
+    rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()

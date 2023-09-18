@@ -26,7 +26,7 @@ def generate_launch_description():
     
 
 
-    possible_poses = [(-0.0,0.5),(1.0,0.50), (0.11,-0.61)]
+    possible_poses = [(0.88,-0.56), (0.25, 0.99), (-0.65,-1.39)]
     random.seed(1337)
     x_random,y_random = random.choice(possible_poses)
     box_x_pose = LaunchConfiguration('box_x_pose', default=str(x_random))

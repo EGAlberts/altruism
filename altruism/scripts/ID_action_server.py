@@ -15,7 +15,7 @@ from darknet_ros_msgs.action import CheckForObjects
 from copy import deepcopy
 from itertools import cycle
 import numpy as np
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
 import math
 
 
@@ -81,7 +81,20 @@ def quaternion_from_euler(ai, aj, ak):
 
     return q
 
+def cycle_toandfro(iterable):
+    # cycle_toandfro('ABCD') --> A B C D C B A B C D C B A
+    while True:
+        saved = []
+        for element in iterable:
+            yield element
+            saved.append(element)
+        saved.reverse()
+        saved.pop(0)
+        saved.pop()
+        while saved:
+            yield saved.pop(0)
 
+              
 class IdentifyActionServer(Node):
 
     def __init__(self):
@@ -120,11 +133,30 @@ class IdentifyActionServer(Node):
         #float32 probability
         self.get_logger().info('ID Action server created...')
 
-        self.picture_rate = self.get_parameter(PICTURE_RT_PARAM).get_parameter_value().integer_value #parameterize
+        self.picture_rate = self.get_parameter(PICTURE_RT_PARAM).get_parameter_value().integer_value
         self.detection_threshold = self.get_parameter(DET_THRESH_PARAM).get_parameter_value().integer_value #parameterize
         self.goal_object = self.get_parameter(GOAL_OBJ_NAME_PARAM).get_parameter_value().string_value
 
         self.nav_to_pose_client = ActionClient(self, NavigateToPose, 'navigate_to_pose')
+
+        self.initial_pose_pub = self.create_publisher(PoseWithCovarianceStamped,
+                                                      'initialpose',
+                                                      10)
+        self.initial_pose = PoseWithCovarianceStamped()
+        self.initial_pose.header.frame_id = 'map'
+        self.initial_pose.header.stamp = self.get_clock().now().to_msg()
+        
+        self.initial_pose.pose.pose.position.x = -2.0
+        self.initial_pose.pose.pose.position.y = -0.5
+
+        self.previous_pose = self.initial_pose.pose
+
+        q = quaternion_from_euler(0, 0, 0)
+        self.initial_pose.pose.pose.orientation.x = q[0]
+        self.initial_pose.pose.pose.orientation.y = q[1]
+        self.initial_pose.pose.pose.orientation.z = q[2]
+        self.initial_pose.pose.pose.orientation.w = q[3]
+        
 
 
 
@@ -141,6 +173,42 @@ class IdentifyActionServer(Node):
         """Send a `NavToPose` action request."""
         if pose is None:
             return False
+        
+        #Intermediate Pose to help navigation -- perhaps should use recursion..
+        inter_pose = PoseStamped()
+        inter_pose.header.frame_id = 'map'
+
+        inter_pose.pose.orientation = pose.pose.orientation
+
+        inter_pose.pose.position.x = (self.previous_pose.pose.position.x + pose.pose.position.x)/2
+        inter_pose.pose.position.y = (self.previous_pose.pose.position.y + pose.pose.position.y)/2
+
+        inter_pose.header.stamp = self.get_clock().now().to_msg()
+
+        self.get_logger().debug("Waiting for 'NavigateToPose' action server")
+        while not self.nav_to_pose_client.wait_for_server(timeout_sec=1.0):
+            self.get_logger().info("'NavigateToPose' action server not available, waiting...")
+
+
+        goal_msg = NavigateToPose.Goal()
+        goal_msg.pose = inter_pose
+        goal_msg.behavior_tree = behavior_tree
+
+        send_goal_future = self.nav_to_pose_client.send_goal_async(goal_msg,
+                                                                   self._feedbackCallback)
+        rclpy.spin_until_future_complete(self, send_goal_future)
+        
+        self.goal_handle = send_goal_future.result()
+
+        if not self.goal_handle.accepted:
+            self.get_logger().error('Goal to ' + str(pose.pose.position.x) + ' ' +
+                       str(pose.pose.position.y) + ' was rejected!')
+            return False
+
+        self.result_future = self.goal_handle.get_result_async()
+        rclpy.spin_until_future_complete(self, self.result_future,timeout_sec=20)
+
+        ###
 
         pose.header.stamp = self.get_clock().now().to_msg()
 
@@ -165,21 +233,26 @@ class IdentifyActionServer(Node):
             return False
 
         self.result_future = self.goal_handle.get_result_async()
-        rclpy.spin_until_future_complete(self, self.result_future,timeout_sec=20)
+        rclpy.spin_until_future_complete(self, self.result_future,timeout_sec=None)
         
         #self.get_logger().info('NavToPose result error code: ' + str(self.result_future.result().result.error_code)) this should work in a future release of nav2
 
-        
+        self.previous_pose = pose    
 
         return True
     
 
     def execute_callback(self, goal_handle):
+
+        self.get_logger().info('inital pose...')
+
+        self.initial_pose_pub.publish(self.initial_pose) #this needs to be provided for when you use a map and not slam.
+
         self.get_logger().info('Executing goal...')
 
         self.get_logger().info('Its me, hi, Im a ID action server')
         self.map = goal_handle.request.map
-        self.get_logger().info('Mepp height: {1} width: {0}'.format(self.map.info.width, self.map.info.height))
+        self.get_logger().info('Mepp height: {1} width: {0} data: {2}'.format(self.map.info.width, self.map.info.height, self.map.data))
 
 
         map_rows = [self.map.data[x:x+self.map.info.width] for x in range(0, len(self.map.data), self.map.info.width)]
@@ -215,7 +288,7 @@ class IdentifyActionServer(Node):
                 pt[1] = origin_x + ( (pt[1]*self.map.info.resolution) + (self.map.info.resolution/2))
                 pt[0] = origin_y + ( (pt[0]*self.map.info.resolution) + (self.map.info.resolution/2))
 
-                #self.get_logger().info('pt[0]: {0} pt[1]: {1} '.format(pt[0], pt[1]))
+                self.get_logger().info('pt[0]: {0} pt[1]: {1}  resolution {2}'.format(pt[0], pt[1], self.map.info.resolution))
 
         points_to_visit = []
 
@@ -225,7 +298,7 @@ class IdentifyActionServer(Node):
             #Once again as the pt's are in row,col this is the reverse of x,y so we handle them in reverse.
             horizontal_middle = (max(all_the_ys) + min(all_the_ys)) / 2
             vertical_bottom = min(all_the_xs)
-            points_to_visit.append([vertical_bottom - 0.2, -horizontal_middle, 0.0]) #the 0.2 is so the robot is a bit below and doesn't collide with the obstacle
+            points_to_visit.append([vertical_bottom - 0.4, -horizontal_middle + 0.15, math.atan2(-horizontal_middle - (-horizontal_middle + 0.15), vertical_bottom - (vertical_bottom - 0.4))]) #the 0.4 is so the robot is a bit below and doesn't collide with the obstacle
 
 
         route_poses = []
@@ -247,16 +320,33 @@ class IdentifyActionServer(Node):
         self.get_logger().info(str(route_poses))
         self.get_logger().info("\n\n")
 
-        self.obstacle_visiting_loop = cycle(route_poses)
+
+
+        
+        reordered_visiting = []
+
+        reordered_visiting.append(min(route_poses,key=lambda rt_pose: math.dist([-2.0, -0.5],[rt_pose.pose.position.x,rt_pose.pose.position.y])))
+        route_poses.remove(reordered_visiting[-1])
+
+
+        while route_poses != []:
+            last_entry = reordered_visiting[-1]
+            reordered_visiting.append(min(route_poses,key=lambda rt_pose: math.dist([last_entry.pose.position.x, last_entry.pose.position.y],[rt_pose.pose.position.x,rt_pose.pose.position.y])))
+            route_poses.remove(reordered_visiting[-1]) #could be a one-liner if you use pop and index..
+
+        self.obstacle_visiting_loop = cycle_toandfro(reordered_visiting)
+            
+
+
+
         #find the average y and the lowest x, send the robot to a bit below that each time and after you reach it you identify it?? but this defeats our adaptation :(
         self.picture_taken = False
         while self.times_detected < self.detection_threshold:
-            print("gonna wait 5 seconds now and then try to send the image to identify")
-
 
             self.goToPose(next(self.obstacle_visiting_loop, None))
             #time.sleep(self.picture_rate)        
-            self.picture_rate = self.get_parameter(PICTURE_RT_PARAM).get_parameter_value().integer_value #parameterize
+            self.picture_rate = self.get_parameter(PICTURE_RT_PARAM).get_parameter_value().integer_value
+            self.get_logger().info("Picture Rate: " + str(self.picture_rate))
             
             for i in range(self.picture_rate):
                 #take a picture

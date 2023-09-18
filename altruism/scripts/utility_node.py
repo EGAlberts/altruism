@@ -34,7 +34,7 @@ class UtilityManager(Node):
 
         weight_sum = sum([nfr.weight for nfr in response.nfrs_in_tree])
 
-        utility_value = 0
+        utility_value = 0.0
         for nfr in response.nfrs_in_tree:
             utility_value += (nfr.weight/weight_sum) * nfr.metric
 

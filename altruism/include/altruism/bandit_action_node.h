@@ -34,24 +34,26 @@ public:
   // using RosActionNode::providedBasicPorts()
   static PortsList providedPorts()
   {
-    return providedBasicPorts({InputPort<std::string>("rb_name")});
+    return providedBasicPorts({});
   }
 
   // This is called when the TreeNode is ticked and it should
   // send the request to the action server
   bool setGoal(RosActionNode::Goal& goal) override 
   {
+    RCLCPP_INFO(node_->get_logger(), "setGoal in BanditClient Called");
+
     std::string some_text;
     //goal->parameters = NULL;
     // // get "radius" from the Input port
-    getInput("rb_name", some_text);
+    // getInput("rb_name", some_text);
     std::stringstream ss;
 
-    ss << "Port info received: ";
-    // for (auto number : feedback->left_time) {
-    ss << some_text;
-    // }
-    RCLCPP_INFO(node_->get_logger(), ss.str().c_str());
+    // ss << "Port info received: ";
+    // // for (auto number : feedback->left_time) {
+    // ss << some_text;
+    // // }
+    // RCLCPP_INFO(node_->get_logger(), ss.str().c_str());
     // return true, if we were able to set the goal correctly.
     return true;
   }
@@ -60,6 +62,8 @@ public:
   // Based on the reply you may decide to return SUCCESS or FAILURE.
   NodeStatus onResultReceived(const WrappedResult& wr) override
   {
+    RCLCPP_INFO(node_->get_logger(), "onResultReceived in BanditClient Called");
+
     // std::stringstream ss;
     // ss << "Result received: ";
     // for (auto number : wr.result) {
@@ -76,6 +80,8 @@ public:
   // If not overridden, it will return FAILURE by default.
   virtual NodeStatus onFailure(ActionNodeErrorCode error) override
   {
+    RCLCPP_INFO(node_->get_logger(), "onFailure in BanditClient Called");
+
     RCLCPP_ERROR(node_->get_logger(), "Error: %d", error);
     return NodeStatus::FAILURE;
   }
@@ -89,6 +95,8 @@ public:
   // The Cancel request will be send automatically to the server.
   NodeStatus onFeedback(const std::shared_ptr<const Feedback> feedback)
   {
+    RCLCPP_INFO(node_->get_logger(), "onFeedback in BanditClient Called");
+
     std::string some_text;
     std::stringstream ss;
     ss << "Feedback received: ";

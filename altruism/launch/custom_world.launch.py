@@ -43,7 +43,7 @@ def generate_launch_description():
     world = os.path.join(
         get_package_share_directory('altruism'),
         'worlds',
-        'dark_world.world'
+        'boxes.world'
     )
 
 
