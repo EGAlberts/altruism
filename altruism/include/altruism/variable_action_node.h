@@ -14,8 +14,15 @@ using namespace BT;
 using VariableParameters = altruism_msgs::msg::VariableParameters;
 using ParamValue = rcl_interfaces::msg::ParameterValue;
 
+
+class VariableActionNodeBase {
+public:
+    static constexpr const char* VARIABLE_PARAMS = "variable_parameters";
+};
+
+
 template <class ActionT>
-class VariableActionNode : public RosActionNode<ActionT>
+class VariableActionNode : public RosActionNode<ActionT>, public VariableActionNodeBase
 {
 public:
     VariableActionNode(const std::string &name, const BT::NodeConfig &config,const RosNodeParams &params)
@@ -23,7 +30,6 @@ public:
     {
     }
 
-    static constexpr const char* VARIABLE_PARAMS = "variable_parameters";
 
     static PortsList providedPorts()
     {

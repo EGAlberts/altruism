@@ -1,0 +1,2 @@
+float64 system_utility
+Configuration[] system_possible_configurations

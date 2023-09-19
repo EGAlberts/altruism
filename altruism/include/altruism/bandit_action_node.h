@@ -19,6 +19,9 @@ using Bandit = altruism_msgs::action::Bandit;
 class BanditAction: public RosActionNode<Bandit>
 {
 public:
+
+  static constexpr const char* BNDT_NAME_PORT = "bandit_name";
+
   BanditAction(const std::string& name,
                   const NodeConfig& conf,
                   const RosNodeParams& params)
@@ -34,7 +37,7 @@ public:
   // using RosActionNode::providedBasicPorts()
   static PortsList providedPorts()
   {
-    return providedBasicPorts({});
+    return providedBasicPorts({InputPort<std::string>(BNDT_NAME_PORT, "Which multi-armed bandit you'd like to use")});
   }
 
   // This is called when the TreeNode is ticked and it should
@@ -43,12 +46,14 @@ public:
   {
     RCLCPP_INFO(node_->get_logger(), "setGoal in BanditClient Called");
 
-    std::string some_text;
+    std::string bandit_name;
     //goal->parameters = NULL;
     // // get "radius" from the Input port
     // getInput("rb_name", some_text);
-    std::stringstream ss;
+    getInput(BNDT_NAME_PORT, bandit_name);
 
+    std::stringstream ss;
+    goal.bandit_name = bandit_name;
     // ss << "Port info received: ";
     // // for (auto number : feedback->left_time) {
     // ss << some_text;

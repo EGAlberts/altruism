@@ -30,6 +30,10 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/NFR.msg"
   "msg/VariableParameter.msg"
   "msg/VariableParameters.msg"
+  "msg/AdaptationState.msg"
+  "msg/Configuration.msg"
+
+
 
 
   DEPENDENCIES builtin_interfaces geometry_msgs nav_msgs rcl_interfaces

@@ -12,4 +12,4 @@
   ros__parameters:
     max_objects_per_second: 0.2
     mission_qa_window: 20
-    bt_filename: "onlyID.xml"
+    bt_filename: "onlyIDBandit.xml"
