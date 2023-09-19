@@ -10,7 +10,7 @@
         </MissionNFR>
       </Sequence>
       </EnergyNFR>
-      <Bandit/>
+      <Bandit bandit_name="UCB" />
     </Parallel>
   </BehaviorTree>
 </root>

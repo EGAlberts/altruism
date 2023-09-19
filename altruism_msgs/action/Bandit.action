@@ -1,4 +1,5 @@
-string[] parameters
+string bandit_name
+string[] hyperparameters
 ---
 float32 average_reward
 ---

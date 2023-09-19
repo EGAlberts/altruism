@@ -37,6 +37,8 @@ public:
     _var_params = VariableParameters();
 
     VariableParam picture_rate_param = VariableParam();
+    VariableParam pret_param = VariableParam();
+
 
     picture_rate_param.name = PICTURE_RT_PARAM;
     int pc_rate_values[4] = {1,3,5,7};
@@ -49,6 +51,18 @@ public:
     }
 
     _var_params.variable_parameters.push_back(picture_rate_param); //vector of VariableParameter
+
+    // pret_param.name = "pretend_var";
+    // int pret_values[2] = {10,20};
+
+    // for (int val : pret_values) {
+    //   ParamValue possible_value = ParamValue();
+    //   possible_value.type = 2; //integer type
+    //   possible_value.integer_value = val;
+    //   pret_param.possible_values.push_back(possible_value);
+    // }
+
+    // _var_params.variable_parameters.push_back(pret_param); //vector of VariableParameter
     
     setOutput(VARIABLE_PARAMS, _var_params);
 
