@@ -322,15 +322,15 @@ class EnergyNFR : public NFRNode
     }
 
 	static float calculate_power_motion(float speed) {
-		return 6.25 * sqrt(speed) + 9.79 * speed + 3.66
+      return 6.25 * sqrt(speed) + 9.79 * speed + 3.66
 	}
 	
 	static float calculate_power_consumption(float detections float speed) {	
-		// average power consumed per detection
-		float detection_average_power = 24.0
-		// average power consumed when the robot is idle
-		float idle = 12.0
-		return calculate_power_motion(speed) + idle + (detection_average_power * detections)
+	  // average power consumed per detection
+	  float detection_average_power = 24.0
+      // average power consumed when the robot is idle
+      float idle = 12.0
+      return calculate_power_motion(speed) + idle + (detection_average_power * detections)
 	}
 
     virtual void calculate_measure() override
@@ -355,7 +355,7 @@ class EnergyNFR : public NFRNode
       getInput("in_linear_speed",linear_speed);
 
 	
-	  power_value = calculate_power_consumption(linear_speed, detections)
+      power_value = calculate_power_consumption(linear_speed, detections)
 
       //std::cout << "\n x from within the NFR energy speed " << linear_speed << "\n" << std::endl;
 
