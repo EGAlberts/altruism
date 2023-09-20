@@ -111,8 +111,9 @@ class BanditActionServer(Node):
     
     def listener_callback(self, msg):
         #self.get_logger().info('I heard: "%s"' % msg.data)
-        if(msg is not None): 
-            self.reward = msg.system_utility
+        if(msg is not None):
+            self.reward = 0 
+            for qr in msg.qr_values: self.reward+=qr.qr_fulfilment 
             self.possible_configs = msg.system_possible_configurations
 
             if(self.prev_configurations_msg != msg.system_possible_configurations):

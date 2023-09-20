@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 import sys
 
-from altruism_msgs.srv import SetBlackboard
+from altruism_msgs.srv import SetAttributeInBlackboard
+from altruism_msgs.msg import SystemAttributeType, SystemAttributeValue, SystemAttribute
+
 from sensor_msgs.msg import BatteryState
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 import rclpy
@@ -27,12 +29,12 @@ class SystemReflection(Node):
         exclusive_group = MutuallyExclusiveCallbackGroup()
         sub_group = MutuallyExclusiveCallbackGroup()
         self.counter = 0
-        self.cli = self.create_client(SetBlackboard, '/set_blackboard', callback_group=exclusive_group)
+        self.cli = self.create_client(SetAttributeInBlackboard, '/set_attribute_in_blackboard', callback_group=exclusive_group)
         self.subscription = self.create_subscription(BatteryState,'/battery/status',self.battery_state_cb,10, callback_group=sub_group)
         self.odometry_subscription = self.create_subscription(Odometry,'/odom',self.tb_odom_cb,10, callback_group = MutuallyExclusiveCallbackGroup())
         
-        self.req = SetBlackboard.Request()
-
+        self.req = SetAttributeInBlackboard.Request()
+        self.odom_msg = None
         self.time_monitor_timer = self.create_timer(2, self.do_stuff, callback_group=timer_cb_group)
         self.battery_state = None
         self.state_queue = deque(maxlen=20) #just picked a random length, can be adjusted..
@@ -51,7 +53,8 @@ class SystemReflection(Node):
         
     
     def tb_odom_cb(self,msg):
-        self.linear_speed = np.hypot(msg.twist.twist.linear.x, msg.twist.twist.linear.y)
+        self.odom_msg = msg
+        #self.linear_speed = np.hypot(msg.twist.twist.linear.x, msg.twist.twist.linear.y)
         self.counter+=1
         if(self.counter % 1000 == 0): self.get_logger().info('1000th Odom Msg Received!!')
         if self.counter > 200000: self.counter = 0
@@ -63,16 +66,34 @@ class SystemReflection(Node):
         #print('lpp'+ str(i))
         self.get_logger().info("Processing battery state and calling service client...")
         
-        script = self.process_bt_state()
-        print("\nscript is " + script + "\n\n")
-        if(script != ""):
-            self.req.script_code = script 
-            response = self.cli.call(self.req)
+        #script = self.process_bt_state()
+        #print("\nscript is " + script + "\n\n")
+        #if(script != ""):
+            # self.req.script_code = script 
+            # response = self.cli.call(self.req)
 
-            self.get_logger().info('Result of it ' + str(response.success))
+            # self.get_logger().info('Result of it ' + str(response.success))
 
             
-            self.battery_state = None
+            # self.battery_state = None
+
+        if(self.odom_msg is not None):
+            new_sys_att = SystemAttribute()
+            new_sys_att.name = 'odometry'
+
+            att_value = SystemAttributeValue()
+            att_value.type = 1 #odometry type
+            att_value.odom_value = self.odom_msg
+            new_sys_att.value = att_value 
+            self.req.sys_attribute = new_sys_att
+
+            response = self.cli.call(self.req)
+
+            self.get_logger().info('Result of call to set attribute in blackboard ' + str(response.success))
+
+            self.odom_msg = None
+
+        
 
     
     def script_string(self, field, value):
@@ -104,7 +125,7 @@ class SystemReflection(Node):
             for field in fields:
                 assignment_string += self.script_string(field, getattr(bt_state,field))
 
-            assignment_string+= self.script_string("linear_speed", self.linear_speed)
+            #assignment_string+= self.script_string("linear_speed", self.linear_speed)
             assignment_string = assignment_string[:-2]
             return assignment_string
         except IndexError:

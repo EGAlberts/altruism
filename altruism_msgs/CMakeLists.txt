@@ -26,15 +26,17 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/GetNFR.srv"
   "srv/GetVariableParams.srv"
   "srv/SetWeights.srv"
+  "srv/SetAttributeInBlackboard.srv"
   "msg/ObjectsIdentified.msg"
   "msg/NFR.msg"
   "msg/VariableParameter.msg"
   "msg/VariableParameters.msg"
   "msg/AdaptationState.msg"
   "msg/Configuration.msg"
-
-
-
+  "msg/QRValue.msg"
+  "msg/SystemAttributeValue.msg"
+  "msg/SystemAttributeType.msg"
+  "msg/SystemAttribute.msg"
 
   DEPENDENCIES builtin_interfaces geometry_msgs nav_msgs rcl_interfaces
 )

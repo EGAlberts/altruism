@@ -4,7 +4,7 @@ from rclpy.node import Node
 from altruism_msgs.srv import GetNFR, GetVariableParams
 from rcl_interfaces.msg import Parameter
 from std_msgs.msg import Float64
-from altruism_msgs.msg import AdaptationState, Configuration
+from altruism_msgs.msg import AdaptationState, Configuration, QRValue
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 from itertools import product
@@ -41,10 +41,15 @@ class UtilityManager(Node):
         weight_sum = sum([nfr.weight for nfr in response.nfrs_in_tree])
 
         utility_value = 0.0
-        for nfr in response.nfrs_in_tree:
-            utility_value += (nfr.weight/weight_sum) * nfr.metric
 
-        return utility_value
+        all_the_qrs = []
+        for nfr in response.nfrs_in_tree:
+            qr_val = QRValue()
+            qr_val.name = nfr.nfr_name
+            qr_val.qr_fulfilment = (nfr.weight/weight_sum) * nfr.metric
+            all_the_qrs.append(qr_val)
+
+        return all_the_qrs
     
     def get_system_vars(self):
         self.get_logger().info("Calling VariableParams service client...")
@@ -98,7 +103,7 @@ class UtilityManager(Node):
 
         
         msg = AdaptationState()
-        msg.system_utility = self.get_system_utility()
+        msg.qr_values = self.get_system_utility()
         msg.system_possible_configurations = self.get_system_vars()
         self.publisher_.publish(msg)
         self.get_logger().info('Publishing: "%s"' % msg)

@@ -17,6 +17,8 @@
   <depend>altruism_msgs</depend>
   <depend>darknet_ros_msgs</depend>
   <depend>geometry_msgs</depend>
+  <depend>nav_msgs</depend>
+  
   <depend>sensor_msgs</depend>
   <depend>slam_toolbox</depend>
   

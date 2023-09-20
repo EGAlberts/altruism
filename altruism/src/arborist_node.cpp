@@ -12,15 +12,18 @@
 #include "altruism_msgs/action/behavior_tree.hpp"
 
 #include "altruism_msgs/srv/set_blackboard.hpp"
+#include "altruism_msgs/srv/set_attribute_in_blackboard.hpp"
 #include "altruism_msgs/srv/get_blackboard.hpp"
 #include "altruism_msgs/srv/get_nfr.hpp"
 #include "altruism_msgs/srv/get_variable_params.hpp"
 #include "altruism_msgs/srv/set_weights.hpp"
 #include "altruism_msgs/msg/nfr.hpp"
+#include "altruism_msgs/msg/system_attribute_value.hpp"
 
 
 
 
+#include "altruism/system_attribute_value.hpp"
 #include "altruism/bandit_action_node.h"
 #include "altruism/slam_action_node.h"
 #include "altruism/identify_action_node.h"
@@ -37,9 +40,14 @@ using namespace BT;
 using std::placeholders::_1;
 using std::placeholders::_2;
 
+
+
+
 class Arborist : public rclcpp::Node
 {
 public:
+  using SystemAttributeValueMsg = altruism_msgs::msg::SystemAttributeValue;
+  using SetAttributeInBlackboard = altruism_msgs::srv::SetAttributeInBlackboard;
   using SetBlackboard = altruism_msgs::srv::SetBlackboard;
   using GetBlackboard = altruism_msgs::srv::GetBlackboard;
   using GetNFR = altruism_msgs::srv::GetNFR;
@@ -59,6 +67,7 @@ public:
   Arborist(std::string name = "arborist_node") : Node(name)
   { 
 
+      _set_att_in_blackboard = this->create_service<SetAttributeInBlackboard>("set_attribute_in_blackboard", std::bind(&Arborist::handle_set_atb_bb, this, _1, _2));
       _set_blackboard = this->create_service<SetBlackboard>("set_blackboard", std::bind(&Arborist::handle_set_bb, this, _1, _2));
       _get_blackboard = this->create_service<GetBlackboard>("get_blackboard", std::bind(&Arborist::handle_get_bb, this, _1, _2));
       _get_nfr = this->create_service<GetNFR>("get_nfr", std::bind(&Arborist::handle_get_nfr, this, _1, _2));
@@ -77,13 +86,15 @@ public:
       std::bind(&Arborist::handle_tree_cancel, this, _1),
       std::bind(&Arborist::handle_tree_accepted, this, _1));
 
-      registerCustomNode<BanditAction>(factory, "bt_bandit_client", "bandit", "Bandit");
-      registerCustomNode<SLAMAction>(factory, "bt_slam_client", "slam", "SLAMfd");
-      registerCustomNode<IdentifyAction>(factory, "bt_identify_client", "identify", "IDfd");
-
-
+      //I suppose here you register all the possible custom nodes, and the determination as to whether they are actually used lies in the xml tree provided.
+      registerActionClient<BanditAction>(factory, "bt_bandit_client", "bandit", "Bandit");
+      registerActionClient<SLAMAction>(factory, "bt_slam_client", "slam", "SLAMfd");
+      registerActionClient<IdentifyAction>(factory, "bt_identify_client", "identify", "IDfd");
       factory.registerNodeType<MissionCompleteNFR>("MissionNFR");
       factory.registerNodeType<EnergyNFR>("EnergyNFR");
+
+
+
 
       this->declare_parameter(BT_NAME_PARAM, "onlyIDBandit.xml");
       std::string bt_name = this->get_parameter(BT_NAME_PARAM).as_string();
@@ -114,7 +125,7 @@ public:
   }
 
   template <class T>
-  void registerCustomNode(BehaviorTreeFactory& factory, std::string client_name, std::string action_name, std::string name_in_xml)
+  void registerActionClient(BehaviorTreeFactory& factory, std::string client_name, std::string action_name, std::string name_in_xml)
   {
     auto nh = std::make_shared<rclcpp::Node>(client_name);
 
@@ -155,6 +166,21 @@ private:
 
     return true;
     
+  }
+
+
+
+  void handle_set_atb_bb(const std::shared_ptr<SetAttributeInBlackboard::Request> request,
+        std::shared_ptr<SetAttributeInBlackboard::Response> response)
+  {
+    RCLCPP_INFO(this->get_logger(), "Set Attribute Service Called in Arborist Node");
+
+    auto sys_attr = request->sys_attribute;
+
+    auto sys_attvalue_obj = altruism::SystemAttributeValue(sys_attr.value);
+    tree.rootBlackboard()->set<altruism::SystemAttributeValue>(sys_attr.name, sys_attvalue_obj);
+
+    //Call template func here
   }
   void handle_set_bb(const std::shared_ptr<SetBlackboard::Request> request,
         std::shared_ptr<SetBlackboard::Response> response)
@@ -471,6 +497,8 @@ private:
   rclcpp::Service<GetNFR>::SharedPtr _get_nfr;
   rclcpp::Service<GetVParams>::SharedPtr _get_var_param;
   rclcpp::Service<SetWeights>::SharedPtr _set_weights;
+  rclcpp::Service<SetAttributeInBlackboard>::SharedPtr _set_att_in_blackboard;
+
 
   rclcpp_action::Server<BTAction>::SharedPtr _start_tree; 
 };
