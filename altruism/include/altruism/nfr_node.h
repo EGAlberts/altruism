@@ -322,7 +322,7 @@ class EnergyNFR : public NFRNode
     }
 
     static float calculate_power_motion(float speed) {
-      return 6.25 * sqrt(speed) + 9.79 * speed + 3.66
+      return 6.25 * pow(speed, 2) + 9.79 * speed + 3.66
     }
 	
     static float calculate_power_consumption(float detections float speed) {	
