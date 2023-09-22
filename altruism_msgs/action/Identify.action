@@ -2,5 +2,7 @@ nav_msgs/OccupancyGrid map
 ---
 float32 time_elapsed
 int32 picture_rate
+int32 detection_threshold
 ---
+int32 picture_rate
 altruism_msgs/ObjectsIdentified obj_idd

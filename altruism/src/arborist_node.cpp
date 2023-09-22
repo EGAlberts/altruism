@@ -57,13 +57,20 @@ public:
   using BTAction = altruism_msgs::action::BehaviorTree;
   using GoalHandleBTAction = rclcpp_action::ServerGoalHandle<BTAction>;
   const std::string MSN_MAX_OBJ_PS_NAME = "max_objects_per_second";
+  const std::string ENG_MAX_PIC_PS_NAME = "max_pictures_per_second";
   const std::string MSN_WINDOW_LEN_NAME = "mission_qa_window";
+  const std::string ENG_WINDOW_LEN_NAME = "energy_qa_window";
+
   const std::string BT_NAME_PARAM = "bt_filename";
+  const std::string EXP_NAME_PARAM = "experiment_name";
+
   
 
   BT::Tree tree;
   BehaviorTreeFactory factory;
-
+  std::string bt_name;
+  std::string experiment_name;
+  
   Arborist(std::string name = "arborist_node") : Node(name)
   { 
 
@@ -97,30 +104,47 @@ public:
 
 
       this->declare_parameter(BT_NAME_PARAM, "onlyIDBandit.xml");
-      std::string bt_name = this->get_parameter(BT_NAME_PARAM).as_string();
+      this->declare_parameter(EXP_NAME_PARAM, "no_experiment_name");
+
+      bt_name = this->get_parameter(BT_NAME_PARAM).as_string();
+      experiment_name = this->get_parameter(EXP_NAME_PARAM).as_string();
 
       RCLCPP_INFO(this->get_logger(), bt_name.c_str());
 
       tree = factory.createTreeFromFile(tree_dir + bt_name);
 
       this->declare_parameter(MSN_MAX_OBJ_PS_NAME, 1.0);
+      this->declare_parameter(ENG_MAX_PIC_PS_NAME, 1.0);
       this->declare_parameter(MSN_WINDOW_LEN_NAME, 20);
+      this->declare_parameter(ENG_WINDOW_LEN_NAME, 20);
+      
+      
+
 
       double max_objs_ps = this->get_parameter(MSN_MAX_OBJ_PS_NAME).as_double();
-      int window_length = this->get_parameter(MSN_WINDOW_LEN_NAME).as_int();
+
+      float max_pics_ps = this->get_parameter(ENG_MAX_PIC_PS_NAME).as_double();
+      int msn_window_length = this->get_parameter(MSN_WINDOW_LEN_NAME).as_int();
+      int eng_window_length = this->get_parameter(ENG_WINDOW_LEN_NAME).as_int();
 
 
-      auto mission_visitor = [max_objs_ps, window_length](TreeNode* node)
+
+      auto node_visitor = [max_objs_ps, msn_window_length, eng_window_length, max_pics_ps](TreeNode* node)
       {
         if (auto mission_nfr_node = dynamic_cast<MissionCompleteNFR*>(node))
         {
           mission_nfr_node->initialize(max_objs_ps,
-                                       window_length);
+                                       msn_window_length);
+        }
+        if (auto energy_nfr_node = dynamic_cast<EnergyNFR*>(node))
+        {
+          energy_nfr_node->initialize(max_pics_ps,
+                                       eng_window_length);
         }
       };
 
       // Apply the visitor to ALL the nodes of the tree
-      tree.applyVisitor(mission_visitor);
+      tree.applyVisitor(node_visitor);
 
   }
 
@@ -132,7 +156,7 @@ public:
     RosNodeParams params;
     params.nh = nh;
     params.default_port_value = action_name;
-    params.server_timeout = std::chrono::milliseconds(2000); //This resolves a race condition with the ServerGoalTimeout (Error 1 in RosActionNode) I suppose caused by the size of the system.
+    params.server_timeout = std::chrono::milliseconds(4000); //This resolves a race condition with the ServerGoalTimeout (Error 1 in RosActionNode) I suppose caused by the size of the system.
     factory.registerNodeType<T>(name_in_xml, params);
 
   }
@@ -179,6 +203,7 @@ private:
 
     auto sys_attvalue_obj = altruism::SystemAttributeValue(sys_attr.value);
     tree.rootBlackboard()->set<altruism::SystemAttributeValue>(sys_attr.name, sys_attvalue_obj);
+    
 
     //Call template func here
   }
@@ -423,8 +448,11 @@ private:
           
           //Reporting on mission
           float id_time_elapsed = tree.rootBlackboard()->get<float>("id_time_elapsed");
-          float id_picture_rate = tree.rootBlackboard()->get<float>("id_picture_rate");
+          int32_t id_picture_rate = tree.rootBlackboard()->get<int32_t>("id_picture_rate");
           float avg_mission_metric = tree.rootBlackboard()->get<float>("mission_mean_metric");
+          float avg_energy_metric = tree.rootBlackboard()->get<float>("energy_mean_metric");
+
+          int32_t id_det_threshold = tree.rootBlackboard()->get<int32_t>("id_det_threshold");
 
           
           auto curr_time_pointer = std::chrono::system_clock::now();
@@ -444,8 +472,12 @@ private:
           // Insert the data to file
           fout << current_time << ", " 
               << id_picture_rate << ", "
-               << avg_mission_metric << ", "
-              << id_time_elapsed << "\n";
+              << avg_mission_metric << ", "
+              << avg_energy_metric << ", "
+              << id_time_elapsed << ", "
+              << id_det_threshold << ", "
+              << experiment_name << ", "
+              << bt_name << "\n";
             
           fout.close();
 

@@ -1,8 +1,8 @@
 /identify_action_server:
   ros__parameters:
-    pic_rate: 1
+    pic_rate: 3
     goal_obj: "fire hydrant"
-    det_threshold: 10
+    det_threshold: 14
 
 /slam_action_server:
   ros__parameters:
@@ -10,6 +10,17 @@
 
 /arborist_node:
   ros__parameters:
-    max_objects_per_second: 0.2
-    mission_qa_window: 20
+    max_objects_per_second: 0.14
+    max_pictures_per_second: 0.4
+    mission_qa_window: 8
+    energy_qa_window: 8
     bt_filename: "onlyIDBandit.xml"
+ 
+/reactive_action_server:
+  ros__parameters:
+    energy_high_threshold: 0.8
+    mission_low_threshold: 0.2
+    
+/utility_node:
+  ros__parameters:
+    adaptation_period: 8

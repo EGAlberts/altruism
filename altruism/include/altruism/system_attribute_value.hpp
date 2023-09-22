@@ -82,7 +82,7 @@ public:
 
   template<SystemAttributeType type>
   constexpr
-  typename std::enable_if<type == SystemAttributeType::ATTRIBUTE_ODOM, const bool &>::type
+  typename std::enable_if<type == SystemAttributeType::ATTRIBUTE_ODOM, const nav_msgs::msg::Odometry &>::type
   get() const
   {
     if (value_.type != altruism_msgs::msg::SystemAttributeType::ATTRIBUTE_ODOM) {

@@ -9,19 +9,25 @@ from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 from itertools import product
 
+ADAP_PERIOD_PARAM = "adaptation_period"
+
+
 class UtilityManager(Node):
 
     def __init__(self):
         super().__init__('utility_manager')
         self.publisher_ = self.create_publisher(AdaptationState, 'system_adaptation_state', 10)
-        timer_period = 0.5  # seconds
-        self.timer = self.create_timer(timer_period, self.timer_callback)
+     
         self.i = 0
         exclusive_group = MutuallyExclusiveCallbackGroup()
+        self.declare_parameter(ADAP_PERIOD_PARAM, 8)
+        self.adaptation_period = self.get_parameter(ADAP_PERIOD_PARAM).get_parameter_value().integer_value
 
+        self.timer = self.create_timer(self.adaptation_period, self.timer_callback)
+        
         self.cli_nfr = self.create_client(GetNFR, '/get_nfr', callback_group=exclusive_group)
         self.cli_var = self.create_client(GetVariableParams, '/get_variable_params', callback_group=exclusive_group)
-
+        
         self.req_nfr = GetNFR.Request()
         self.req_var = GetVariableParams.Request()
 

@@ -2,12 +2,14 @@
 
 #include "behaviortree_cpp/decorator_node.h"
 #include "geometry_msgs/msg/pose_stamped.hpp"
+#include "nav_msgs/msg/odometry.hpp"
+
 #include "altruism_msgs/msg/objects_identified.hpp"
 #include "builtin_interfaces/msg/time.hpp"
 #include <algorithm>
 #include <chrono>
 #include <ctime> 
-#include <cmath>
+#include "altruism/system_attribute_value.hpp"
 
 namespace BT
 {
@@ -147,6 +149,12 @@ private:
       _average_metric = new_average;
     }
 
+    void output_metric()
+    {
+      setOutput(METRIC,std::min(_metric,1.0));
+      _times_calculated++; 
+    }
+
 
 };
 
@@ -201,7 +209,7 @@ class MissionCompleteNFR : public NFRNode
         _max_object_ps = max_objs_ps;
         _window_length = window_length;
 
-        _max_detected = _max_object_ps * _window_length; //What we presume is the max number of objects that'll be detected in a 20 second window.
+        _max_detected = _max_object_ps * double(_window_length); //What we presume is the max number of objects that'll be detected in a 20 second window.
     }
 
 
@@ -238,15 +246,14 @@ class MissionCompleteNFR : public NFRNode
       int elapsed_seconds = current_time-_window_start;
       if(elapsed_seconds >= _window_length)
       {
-        setOutput(METRIC,std::min(_metric,1.0));
-        _times_calculated++; 
+        output_metric();
         metric_mean();
         std::cout << "the mean metric " << _average_metric << std::endl;
         setOutput(MEAN_METRIC,_average_metric);
         _window_start = current_time;
         _detected_in_window = 0;
-
       }
+
       if((_counter % 10000) == 0) {
         std::cout << "\n obj_id bool from within the NFR mission completeness" << objects_msg.object_detected << "\n" << std::endl;
         if(objects_msg.object_detected == true)
@@ -284,37 +291,50 @@ class EnergyNFR : public NFRNode
     builtin_interfaces::msg::Time last_timestamp;
     double max_detected;
     int detected_in_window;
-    int window_length;
     int window_start;
     EnergyNFR(const std::string& name, const NodeConfig& config) : NFRNode(name, config)
     {
       std::cout << "Someone made me (a Energy NFR node) \n\n\n\n\n\n" << std::endl;
       counter = 0;
-      window_length = 20;
-      detection_threshold = 10; //how many times the object needs to be found in a given position to be confirmed to be there.
-      max_detected = 1 * window_length; //What we presume is the max number of objects that'll be detected in a 20 second window.
-      //TODO: make this a parameter.
-      goal_object = "fire hydrant";
-      times_detected = 0; //Also should be a parameter somehow.
-      detected_in_window = 0.0;
-      window_start = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-      
 
+      _window_start = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+      _last_odom = _window_start;
+      _obj_last_timestamp = builtin_interfaces::msg::Time();
+      _odom_last_timestamp_sec = 0;
+      
+      _motion_consumption = 0.0;
+      _idle_consumption = 0.0;
+      _laser_consumption = 0.0;
+
+
+
+
+      
     }
+
+    void initialize(float max_pics_ps, int window_length)
+    {
+        _max_pics_ps = max_pics_ps;
+        _window_length = window_length;
+
+        _max_motion_consumption =  ((6.25 * pow(WAFFLE_MAX_LIN_VEL, 2.0) + 9.79 * WAFFLE_MAX_LIN_VEL +3.66)) * (_window_length+1);
+        _max_picture_consumption = (max_pics_ps * (_window_length+1)) * detection_average_power;
+        _max_idle_consumption = _idle_power * (_window_length + 1);
+        _max_laser_consumption = _laser_power * (_window_length + 1);
+
+        _max_consumption = _max_motion_consumption + _max_picture_consumption + _max_idle_consumption +  _max_laser_consumption;
+    }
+
 
     static PortsList providedPorts()
     {
       PortsList base_ports = NFRNode::providedPorts();
 
       PortsList child_ports = { 
-              InputPort<float>("in_voltage","voltage"),
-              InputPort<float>("in_temperature","temperature"),
-              InputPort<float>("in_current","current"),
-              InputPort<float>("in_charge","charge"),
-              InputPort<float>("in_capacity","capacity"),
-              InputPort<float>("in_design_capacity","design_capacity"),
-              InputPort<float>("in_percentage","percentage"),
-              InputPort<float>("in_linear_speed","linear_speed")};
+              InputPort<altruism::SystemAttributeValue>(IN_ODOM,"odometry message wrapped in a systemattributevalue instance"),
+              InputPort<int32_t>(IN_PIC_RATE,"picture rate of the ID child action"),
+              InputPort<altruism_msgs::msg::ObjectsIdentified>("objs_identified","The objects detected through the robot's camera")
+              };
 
       child_ports.merge(base_ports);
 
@@ -322,81 +342,115 @@ class EnergyNFR : public NFRNode
     }
 
     static float calculate_power_motion(float speed) {
-      return 6.25 * pow(speed, 2) + 9.79 * speed + 3.66
+      return 6.25 * pow(speed, 2) + 9.79 * speed + 3.66;
     }
 	
-    static float calculate_power_consumption(float detections float speed) {	
-      // average power consumed per detection
-      float detection_average_power = 24.0
-      // average power consumed when the robot is idle
-      float idle = 12.0
-      return calculate_power_motion(speed) + idle + (detection_average_power * detections)
-    }
-
     virtual void calculate_measure() override
     {
-      float power_value
-      float voltage;
-      float temperature;
-      float current;
-      float charge;
-      float capacity;
-      float design_capacity;
-      float percentage;
-      float linear_speed;
-      //std::cout << "Here's where I calculate a MissionCompleteness measure" << std::endl;
-      getInput("in_voltage",voltage);
-      getInput("in_temperature",temperature);
-      getInput("in_current",current);
-      getInput("in_charge",charge);
-      getInput("in_capacity",capacity);
-      getInput("in_design_capacity",design_capacity);
-      getInput("in_percentage",percentage);
-      getInput("in_linear_speed",linear_speed);
+      auto res = getInput(IN_ODOM,_odom_attribute); 
+      getInput(IN_PIC_RATE,_pic_rate);
 
-      power_value = calculate_power_consumption(linear_speed, detections)
+      getInput("objs_identified", _objects_msg);
 
-      //std::cout << "\n x from within the NFR energy speed " << linear_speed << "\n" << std::endl;
+      if(res)
+      {
+        _odom_msg = _odom_attribute.get<altruism::SystemAttributeType::ATTRIBUTE_ODOM>();
+        _linear_speed = hypot(fabs(_odom_msg.twist.twist.linear.x), fabs(_odom_msg.twist.twist.linear.y));
+      }
 
-      // counter += 1;
-      // if((some_objects.object_detected == true) && (some_objects.stamp != last_timestamp))
-      // {
-      //   // if(std::find(some_objects.object_names.begin(), some_objects.object_names.end(), goal_object) != std::end(some_objects.object_names)){
-      //   //   times_detected += 1;
-      //   //   last_timestamp = some_objects.stamp;
-      //   // }
-      //   detected_in_window += some_objects.object_names.size();
-      //   last_timestamp = some_objects.stamp;
-      // }
+      if(_objects_msg.stamp != _obj_last_timestamp)
+      {
+        std::cout << "\n\n\n this done happened \n\n\n" << std::endl;
+        _pictures_taken_in_window += _pic_rate;
+        _obj_last_timestamp = _objects_msg.stamp;
+      }
 
-      // //double detection_ratio = times_detected / detection_threshold;
-      // double detection_ratio = (double)detected_in_window / max_detected;
 
-      // auto curr_time_pointer = std::chrono::system_clock::now();
+      if( (_odom_msg.header.stamp.sec-_odom_last_timestamp_sec) >= 1 ) //one second has passed since last odom
+      {
+        
+        _motion_consumption+= calculate_power_motion(_linear_speed);
+        _laser_consumption+= _laser_power;
+        _idle_consumption+=  _idle_power;
+
+        _odom_last_timestamp_sec = _odom_msg.header.stamp.sec;
+        
+      }
+
+      //PR_Motion(v = 6.25⋅v2+9.79⋅v+3.66 
       
-      // int current_time = std::chrono::duration_cast<std::chrono::seconds>(curr_time_pointer.time_since_epoch()).count();
-      // int elapsed_seconds = current_time-window_start;
-      // if(elapsed_seconds >= window_length)
-      // {
-      //   setOutput(MEASURE_NAME,std::min(detection_ratio,1.0));
-      //   window_start = current_time;
-      //   detected_in_window = 0;
-      // }
-      // if((counter % 10000) == 0) {
-      //   std::cout << "\n x from within the NFR mission completeness" << some_pose.pose.position.x << "\n" << std::endl;
-      //   std::cout << "\n obj_id bool from within the NFR mission completeness" << some_objects.object_detected << "\n" << std::endl;
-      //   if(some_objects.object_detected == true)
-      //   {
-      //     for (auto i: some_objects.object_names) std::cout << i << ' ';
-      //   }
-      //   std::cout << "\n detection_ratio " << detection_ratio << "\n" << std::endl;
-      //   std::cout << "\n detected_in_window " << detected_in_window << "\n" << std::endl;
 
 
+      auto curr_time_pointer = std::chrono::system_clock::now();
 
-      //   counter = 0;
-      // }
+      int current_time = std::chrono::duration_cast<std::chrono::seconds>(curr_time_pointer.time_since_epoch()).count();
+      int elapsed_seconds = current_time-_window_start;
+      if(elapsed_seconds >= _window_length)
+      {
+        float picture_consumption = _pictures_taken_in_window * detection_average_power;
+
+        std::cout << "components to power consumption  " << _motion_consumption << " " <<  picture_consumption << " " << _idle_consumption << " " << _laser_consumption << std::endl;
+
+        float total_consumption = _motion_consumption + picture_consumption + _idle_consumption +  _laser_consumption;
+
+
+        _metric = 1 - (total_consumption/_max_consumption); //1 - because power consumption is a bad thing for the QA
+        output_metric();
+        std::cout << "the energy metric " << _metric << std::endl;
+
+        metric_mean();
+
+        std::cout << "the mean energy metric " << _average_metric << std::endl;
+
+        setOutput(MEAN_METRIC,_average_metric);
+
+        _window_start = current_time;
+        _motion_consumption = 0.0;
+        _laser_consumption = 0.0;
+        _idle_consumption = 0.0;
+
+        _pictures_taken_in_window = 0;
+      }
+
     }
+  private:
+      float _max_pics_ps;
+      altruism::SystemAttributeValue _odom_attribute;
+      int32_t _pic_rate;
+      int _pictures_taken_in_window;
+      float _motion_consumption;
+      float _max_consumption;
+      float _max_motion_consumption;
+      float _max_picture_consumption;
+      float _max_picture_taken;
+      float _idle_consumption;
+      float _max_idle_consumption;
+      float _laser_consumption;
+      float _max_laser_consumption;
+      int _window_length;
+      int _window_start;
+      int _last_odom;
+      float _linear_speed;
+
+      nav_msgs::msg::Odometry _odom_msg;
+      altruism_msgs::msg::ObjectsIdentified _objects_msg;
+      int _odom_last_timestamp_sec;
+      builtin_interfaces::msg::Time _obj_last_timestamp;
+
+
+      const float _idle_power = 12.0;
+      const float detection_average_power = 24.0; //watts
+      const float _laser_power = 2.34; //watts
+      const float WAFFLE_MAX_LIN_VEL = 0.26;
+
+
+      static constexpr const char* IN_PIC_RATE = "in_picture_rate";
+      static constexpr const char* IN_ODOM = "in_odom";
+
+
+
+
+
 };
 
 

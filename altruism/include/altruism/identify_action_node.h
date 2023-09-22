@@ -24,6 +24,9 @@ using VariableParam = altruism_msgs::msg::VariableParameter;
 class IdentifyAction: public VariableActionNode<ID>
 {
 public:
+  static constexpr const char* DET_THRESH = "out_det_threshold";
+  static constexpr const char* PC_RATE = "out_picture_rate";
+
   
   const std::string PICTURE_RT_PARAM = "pic_rate";
 
@@ -78,7 +81,9 @@ public:
     PortsList child_ports = { 
               OutputPort<altruism_msgs::msg::ObjectsIdentified>("objs_identified"),
               OutputPort<float>("out_time_elapsed"),
-              OutputPort<int32_t>("out_picture_rate") 
+              OutputPort<int32_t>(PC_RATE),
+              OutputPort<int32_t>(DET_THRESH) 
+
             };
 
     child_ports.merge(base_ports);
@@ -161,7 +166,9 @@ public:
     std::stringstream ss;
     ss << "ID Result received: " << wr.result->time_elapsed << " pic rate" << wr.result->picture_rate;
     setOutput("out_time_elapsed", wr.result->time_elapsed); 
-    setOutput("out_picture_rate", wr.result->picture_rate); 
+    setOutput(PC_RATE, wr.result->picture_rate); 
+    setOutput(DET_THRESH, wr.result->detection_threshold); 
+
 
 
     RCLCPP_INFO(node_->get_logger(), ss.str().c_str());
@@ -200,6 +207,8 @@ public:
     std::stringstream sstwo;
     
     setOutput("objs_identified", feedback->obj_idd); 
+    setOutput(PC_RATE, feedback->picture_rate); 
+
     //of note is that miraculously the BT CPP knows to send this to the current_position field of the blackboard, which is picked up in an NFR, because it is specified in the BT xml
     
     sstwo << "Port info received: ";

@@ -2,7 +2,7 @@
   <BehaviorTree ID="Untitled">
     <Parallel failure_count="1"
               success_count="-1">
-      <EnergyNFR weight="{energy_weight}" in_voltage="{voltage}" in_linear_speed="{linear_speed}" in_temperature="{temperature}" in_current="{current}" in_charge="{charge}" in_capacity="{capacity}" in_design_capacity="{design_capacity}" in_percentage="{percentage}" metric="{energy_metric}">
+      <EnergyNFR weight="{energy_weight}" in_voltage="{voltage}" in_odom="{odometry}" in_temperature="{temperature}" in_current="{current}" in_charge="{charge}" in_capacity="{capacity}" in_design_capacity="{design_capacity}" in_percentage="{percentage}" metric="{energy_metric}">
       <Sequence>
         <Script code="mission_weight:=1.0; current_position:=1.0; energy_weight=1.0; energy_metric:=1.0; mission_metric:=1.0" />
         <MissionNFR weight="{mission_weight}" rob_position="{current_position}" objs_identified="{objects_detected}" metric="{mission_metric}" mean_metric="{mission_mean_metric}" >

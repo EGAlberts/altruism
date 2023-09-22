@@ -59,7 +59,6 @@ class BanditActionServer(Node):
         self.bandit_instance = init_bandit(name=str(goal_handle.request.bandit_name))
 
 
-
         temp_count = 0 #temporarily making it so that the bandit actually finishes
         do_bandit = True
         self.reward = -1
@@ -72,7 +71,7 @@ class BanditActionServer(Node):
             feedback_msg = Bandit.Feedback()
             feedback_msg.chosen_arm = str(next_arm)
 
-            self.get_logger().info(str(self.configuration_dict[next_arm]))
+            #self.get_logger().info(str(self.configuration_dict[next_arm]))
             
             self.req.parameters = self.configuration_dict[next_arm].configuration_parameters
 
@@ -84,7 +83,7 @@ class BanditActionServer(Node):
             if(not all([res.successful for res in response.results])):
                 self.get_logger().warning('One or more requests to set a parameter were unsuccessful in the Bandit, see reason(s):' + str(response.results))
             
-            self.get_logger().info('Param set...')
+            #self.get_logger().info('Param set...')
 
             
 
@@ -94,13 +93,14 @@ class BanditActionServer(Node):
             self.reward = -1
             
 
-            self.get_logger().info('Start waiting...')
+            #self.get_logger().info('Start waiting...')
             
             
             while self.reward == -1: #waiting for the subscriber to receive a new reward
-                pass
+                feedback_msg = Bandit.Feedback()
+                goal_handle.publish_feedback(feedback_msg)
 
-            self.get_logger().info('...done waiting')
+            #self.get_logger().info('...done waiting')
 
 
         goal_handle.succeed()
@@ -118,7 +118,7 @@ class BanditActionServer(Node):
 
             if(self.prev_configurations_msg != msg.system_possible_configurations):
                 #New configurations have been added OR its the first time.
-                self.get_logger().info('Hashable thing happened...')
+                # self.get_logger().info('Hashable thing happened...')
 
                 self.make_hashable()
 
@@ -126,11 +126,12 @@ class BanditActionServer(Node):
                 
                 self.arm_change_flag = True
                 
-            else:
-                self.get_logger().info('Hashable thing didnt happen...',throttle_duration_sec=10)
+            #else:
+                #self.get_logger().info('Hashable thing didnt happen...',throttle_duration_sec=10)
+                
 
             if((self.first_msg_received is False) and (len(msg.system_possible_configurations) != 0)): 
-                self.get_logger().info('Supposedly wasnt empty..'+ str(msg.system_possible_configurations))
+                # self.get_logger().info('Supposedly wasnt empty..'+ str(msg.system_possible_configurations))
                 
                 
                 

@@ -37,7 +37,9 @@ public:
   // using RosActionNode::providedBasicPorts()
   static PortsList providedPorts()
   {
-    return providedBasicPorts({InputPort<std::string>(BNDT_NAME_PORT, "Which multi-armed bandit you'd like to use")});
+    return providedBasicPorts({InputPort<std::string>(BNDT_NAME_PORT, "Which multi-armed bandit you'd like to use"),
+    InputPort<bool>("mission_ongoing", "whether we should cancel our goal.")})
+    ;
   }
 
   // This is called when the TreeNode is ticked and it should
@@ -101,23 +103,30 @@ public:
   NodeStatus onFeedback(const std::shared_ptr<const Feedback> feedback)
   {
     RCLCPP_INFO(node_->get_logger(), "onFeedback in BanditClient Called");
-
+    bool miss_status;
     std::string some_text;
     std::stringstream ss;
     ss << "Feedback received: ";
     // for (auto number : feedback->left_time) {
     ss << feedback->chosen_arm;
     // }
-    RCLCPP_INFO(node_->get_logger(), ss.str().c_str());
+    //RCLCPP_INFO(node_->get_logger(), ss.str().c_str());
 
-    getInput("rb_name", some_text);
+    getInput("mission_ongoing", miss_status);
+
+    if(!miss_status)
+    {
+      RCLCPP_INFO(node_->get_logger(), "mission done in bandit action node");
+
+      return NodeStatus::SUCCESS;
+    }
     std::stringstream sstwo;
 
     sstwo << "Port info received: ";
     // for (auto number : feedback->left_time) {
     sstwo << some_text;
     // }
-    RCLCPP_INFO(node_->get_logger(), sstwo.str().c_str());
+    //RCLCPP_INFO(node_->get_logger(), sstwo.str().c_str());
 
 
     return NodeStatus::RUNNING;

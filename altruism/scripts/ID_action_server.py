@@ -134,6 +134,8 @@ class IdentifyActionServer(Node):
         self.get_logger().info('ID Action server created...')
 
         self.picture_rate = self.get_parameter(PICTURE_RT_PARAM).get_parameter_value().integer_value
+        self.ID_fdback_msg.picture_rate = self.picture_rate
+
         self.detection_threshold = self.get_parameter(DET_THRESH_PARAM).get_parameter_value().integer_value #parameterize
         self.goal_object = self.get_parameter(GOAL_OBJ_NAME_PARAM).get_parameter_value().string_value
 
@@ -174,39 +176,39 @@ class IdentifyActionServer(Node):
         if pose is None:
             return False
         
-        #Intermediate Pose to help navigation -- perhaps should use recursion..
-        inter_pose = PoseStamped()
-        inter_pose.header.frame_id = 'map'
+        # #Intermediate Pose to help navigation -- perhaps should use recursion..
+        # inter_pose = PoseStamped()
+        # inter_pose.header.frame_id = 'map'
 
-        inter_pose.pose.orientation = pose.pose.orientation
+        # inter_pose.pose.orientation = pose.pose.orientation
 
-        inter_pose.pose.position.x = (self.previous_pose.pose.position.x + pose.pose.position.x)/2
-        inter_pose.pose.position.y = (self.previous_pose.pose.position.y + pose.pose.position.y)/2
+        # inter_pose.pose.position.x = (self.previous_pose.pose.position.x + pose.pose.position.x)/2
+        # inter_pose.pose.position.y = (self.previous_pose.pose.position.y + pose.pose.position.y)/2
 
-        inter_pose.header.stamp = self.get_clock().now().to_msg()
+        # inter_pose.header.stamp = self.get_clock().now().to_msg()
 
-        self.get_logger().debug("Waiting for 'NavigateToPose' action server")
-        while not self.nav_to_pose_client.wait_for_server(timeout_sec=1.0):
-            self.get_logger().info("'NavigateToPose' action server not available, waiting...")
+        # self.get_logger().debug("Waiting for 'NavigateToPose' action server")
+        # while not self.nav_to_pose_client.wait_for_server(timeout_sec=1.0):
+        #     self.get_logger().info("'NavigateToPose' action server not available, waiting...")
 
 
-        goal_msg = NavigateToPose.Goal()
-        goal_msg.pose = inter_pose
-        goal_msg.behavior_tree = behavior_tree
+        # goal_msg = NavigateToPose.Goal()
+        # goal_msg.pose = inter_pose
+        # goal_msg.behavior_tree = behavior_tree
 
-        send_goal_future = self.nav_to_pose_client.send_goal_async(goal_msg,
-                                                                   self._feedbackCallback)
-        rclpy.spin_until_future_complete(self, send_goal_future)
+        # send_goal_future = self.nav_to_pose_client.send_goal_async(goal_msg,
+        #                                                            self._feedbackCallback)
+        # rclpy.spin_until_future_complete(self, send_goal_future)
         
-        self.goal_handle = send_goal_future.result()
+        # self.goal_handle = send_goal_future.result()
 
-        if not self.goal_handle.accepted:
-            self.get_logger().error('Goal to ' + str(pose.pose.position.x) + ' ' +
-                       str(pose.pose.position.y) + ' was rejected!')
-            return False
+        # if not self.goal_handle.accepted:
+        #     self.get_logger().error('Goal to ' + str(pose.pose.position.x) + ' ' +
+        #                str(pose.pose.position.y) + ' was rejected!')
+        #     return False
 
-        self.result_future = self.goal_handle.get_result_async()
-        rclpy.spin_until_future_complete(self, self.result_future,timeout_sec=20)
+        # self.result_future = self.goal_handle.get_result_async()
+        # rclpy.spin_until_future_complete(self, self.result_future,timeout_sec=20)
 
         ###
 
@@ -252,8 +254,6 @@ class IdentifyActionServer(Node):
 
         self.get_logger().info('Its me, hi, Im a ID action server')
         self.map = goal_handle.request.map
-        self.get_logger().info('Mepp height: {1} width: {0} data: {2}'.format(self.map.info.width, self.map.info.height, self.map.data))
-
 
         map_rows = [self.map.data[x:x+self.map.info.width] for x in range(0, len(self.map.data), self.map.info.width)]
 
@@ -350,17 +350,16 @@ class IdentifyActionServer(Node):
             
             for i in range(self.picture_rate):
                 #take a picture
-                while self.prev_done is False:
-                    self.get_logger().info("Still procesing prev image")
-                    #Wait for it to be done
-                
-                #presumed prev done
-                self.ID_fdback_msg.obj_idd.stamp = self.get_clock().now().to_msg()
-                goal_handle.publish_feedback(self.ID_fdback_msg)
-                
+
                 #take new
                 self.prev_done = False
                 self.send_goal()
+                
+                self.ID_fdback_msg.obj_idd.stamp = self.get_clock().now().to_msg()
+                goal_handle.publish_feedback(self.ID_fdback_msg)
+                
+
+
 
 
             
@@ -368,6 +367,7 @@ class IdentifyActionServer(Node):
         res = Identify.Result()
         res.time_elapsed = time.time() - self.initial_time
         res.picture_rate = self.picture_rate
+        res.detection_threshold = self.detection_threshold
         return res
 
     def visit_obstacle(self, obstacle):

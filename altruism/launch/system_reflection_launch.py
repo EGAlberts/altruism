@@ -19,6 +19,7 @@ def generate_launch_description():
         Node(
             package='altruism',
             executable='utility_node.py',
-            name='utility_node'
+            name='utility_node',
+            parameters=[config_file,{}]
         ),
     ])
