@@ -18,8 +18,8 @@ def generate_launch_description():
         ),
         Node(
             package='altruism',
-            executable='utility_node.py',
-            name='utility_node',
+            executable='adaptation_manager_node.py',
+            name='adaptation_manager_node',
             parameters=[config_file,{}]
         ),
     ])

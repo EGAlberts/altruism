@@ -53,6 +53,8 @@ class ReactiveActionServer(Node):
                 self.get_logger().info('set_param service not available, waiting again...')
         response = self.cli.call(self.req)
 
+        self.get_logger().info('Reactive is changing parameter to ' + str(self.current_pic_rate) )
+
         if(not all([res.successful for res in response.results])):
             self.get_logger().warning('One or more requests to set a parameter were unsuccessful in the Bandit, see reason(s):' + str(response.results))
 
@@ -60,7 +62,8 @@ class ReactiveActionServer(Node):
 
 
     def increase_picture_rate(self):
-
+        self.get_logger().info('Increasing Picture rate')
+        
         param_values = list(self.config_dict.keys())
 
         new_param_value = min([pic_rate_value for pic_rate_value in param_values if pic_rate_value > self.current_pic_rate], default=-1)
@@ -77,6 +80,8 @@ class ReactiveActionServer(Node):
 
 
     def decrease_picture_rate(self):
+        self.get_logger().info('Lowering Picture rate')
+
         param_values = list(self.config_dict.keys())
 
         new_param_value = max([pic_rate_value for pic_rate_value in param_values if pic_rate_value < self.current_pic_rate], default=-1)
@@ -102,9 +107,10 @@ class ReactiveActionServer(Node):
                 self.get_logger().info('Reactive-based action server is waiting for a message',throttle_duration_sec=5)
 
             if self.qr_values['EnergyNFR'] < self.energy_high_threshold:
-                self.increase_picture_rate()
-            elif(self.qr_values['MissionNFR'] >= self.mission_low_threshold):
                 self.decrease_picture_rate()
+            elif(self.qr_values['MissionNFR'] >= self.mission_low_threshold):
+                self.increase_picture_rate()
+
 
             feedback_msg = Reactive.Feedback()
             feedback_msg.chosen_adaptation = str(self.current_pic_rate)
@@ -136,7 +142,7 @@ class ReactiveActionServer(Node):
                 
             if((self.first_msg_received is False) and (len(msg.system_possible_configurations) != 0)):                 
                 for config in msg.system_possible_configurations:
-                    self.possible_configs[config.configuration_parameters[0].value.integer_value] = config.configuration_parameters[0]
+                    self.config_dict[config.configuration_parameters[0].value.integer_value] = config.configuration_parameters[0]
                 self.first_msg_received = True
 
 

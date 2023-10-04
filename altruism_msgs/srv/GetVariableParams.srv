@@ -1,4 +1,4 @@
 
 ---
-VariableParameters variables_in_tree
+VariableParameters[] variables_in_tree
 VariableParameters constrained_combinations

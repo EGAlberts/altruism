@@ -8,6 +8,7 @@
 #include "behaviortree_ros2/bt_action_node.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "altruism_msgs/msg/variable_parameters.hpp"
+#include "altruism_msgs/msg/variable_parameter.hpp"
 #include "rcl_interfaces/msg/parameter_value.hpp"
 
 using namespace BT;
@@ -30,6 +31,21 @@ public:
     {
     }
 
+    template <class T>
+    void registerAdaptations(std::vector<T> param_values, std::string param_name)
+    {
+        altruism_msgs::msg::VariableParameter variable_param = altruism_msgs::msg::VariableParameter();
+
+        variable_param.name = param_name;
+
+        for (T val : param_values) {
+            rclcpp::ParameterValue par_val = rclcpp::ParameterValue(val);
+            variable_param.possible_values.push_back(par_val.to_value_msg());
+        }
+        _var_params.variable_parameters.push_back(variable_param); //vector of VariableParameter
+        
+    }
+
 
     static PortsList providedPorts()
     {
@@ -37,7 +53,7 @@ public:
     }
 
 protected:
-    VariableParameters _var_params;
+    VariableParameters _var_params = VariableParameters();
 
 
 };

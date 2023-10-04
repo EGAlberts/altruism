@@ -3,6 +3,7 @@
 #include "behaviortree_cpp/decorator_node.h"
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "nav_msgs/msg/odometry.hpp"
+#include "rclcpp/rclcpp.hpp"
 
 #include "altruism_msgs/msg/objects_identified.hpp"
 #include "builtin_interfaces/msg/time.hpp"
@@ -48,6 +49,7 @@ public:
   NFRNode(const std::string& name, const NodeConfig& config) : DecoratorNode(name, config)
   {
     std::cout << "Someone made me (an NFR node) \n\n\n\n\n\n" << std::endl;
+
     _average_metric = 0.0;
     _times_calculated = 0;
     // if (!getInput(WEIGHT, weight_))
@@ -306,7 +308,7 @@ class EnergyNFR : public NFRNode
       _idle_consumption = 0.0;
       _laser_consumption = 0.0;
 
-
+      _pictures_taken_in_window = 0;
 
 
       
@@ -389,12 +391,15 @@ class EnergyNFR : public NFRNode
       {
         float picture_consumption = _pictures_taken_in_window * detection_average_power;
 
+        std::cout << "pic in window " << _pictures_taken_in_window << " det avg " << detection_average_power << std::endl;
         std::cout << "components to power consumption  " << _motion_consumption << " " <<  picture_consumption << " " << _idle_consumption << " " << _laser_consumption << std::endl;
 
         float total_consumption = _motion_consumption + picture_consumption + _idle_consumption +  _laser_consumption;
 
 
         _metric = 1 - (total_consumption/_max_consumption); //1 - because power consumption is a bad thing for the QA
+        std::cout << "total" << total_consumption  << " divided by " << "max" << _max_consumption  << std::endl;
+
         output_metric();
         std::cout << "the energy metric " << _metric << std::endl;
 
@@ -438,8 +443,8 @@ class EnergyNFR : public NFRNode
       builtin_interfaces::msg::Time _obj_last_timestamp;
 
 
-      const float _idle_power = 12.0;
-      const float detection_average_power = 24.0; //watts
+      const float _idle_power = 1.14; //as caused by the detection software running. Idle consumption of the robot as a whole is considered a constant factor.
+      const float detection_average_power = 10.919800; //watts
       const float _laser_power = 2.34; //watts
       const float WAFFLE_MAX_LIN_VEL = 0.26;
 

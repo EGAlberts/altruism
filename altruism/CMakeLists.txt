@@ -45,7 +45,7 @@ install(PROGRAMS
   scripts/ID_action_server.py
   scripts/blackboard_set_client.py
   scripts/blackboard_get_client.py
-  scripts/utility_node.py
+  scripts/adaptation_manager_node.py
   scripts/system_reflection.py
   scripts/tree_action_client.py
   scripts/save_map_client.py

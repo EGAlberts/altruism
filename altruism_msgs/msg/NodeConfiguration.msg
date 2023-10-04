@@ -1,0 +1,2 @@
+string node_name
+rcl_interfaces/Parameter[] configuration_parameters

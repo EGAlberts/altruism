@@ -1,7 +1,7 @@
 <root BTCPP_format="4">
   <BehaviorTree ID="Untitled">
    	<Sequence>
-		<Script code="mission_ongoing:=true"/>
+		<Script code="mission_ongoing:=true" />
 		<Parallel failure_count="1"
 		      success_count="-1">
 			<EnergyNFR _onSuccess="mission_ongoing:=false" weight="{energy_weight}" in_picture_rate="{id_picture_rate}" metric="{energy_metric}" mean_metric="{energy_mean_metric}" in_odom="{odometry}" objs_identified="{objects_detected}">
@@ -12,12 +12,8 @@
 					</MissionNFR>
 				</Sequence>
 			</EnergyNFR>
-			<AlwaysSuccess />
+			<Bandit _while="mission_ongoing" bandit_name="egreedy" />
 		</Parallel>
    	</Sequence>
   </BehaviorTree>
 </root>
-
-
-
-

@@ -34,6 +34,7 @@ class RandomActionServer(Node):
         self.cli = self.create_client(SetParameters, '/identify_action_server/set_parameters', callback_group=MutuallyExclusiveCallbackGroup())
         self.req = SetParameters.Request()
         self.time_to_adapt = False
+        self.current_pic_rate = 0
         self.get_logger().info('Random-based Action server created...')
 
     
@@ -63,10 +64,15 @@ class RandomActionServer(Node):
 
             self.req.parameters = random_config.configuration_parameters
 
-            self.send_set_parameters()
+            self.current_pic_rate = random_config.configuration_parameters[0].value.integer_value
 
+            self.send_set_parameters()
+            
             feedback_msg = Random.Feedback()
             feedback_msg.chosen_adaptation = str(self.current_pic_rate)
+
+            self.get_logger().info('Random-based action server adapted the system to parameter value ' + str(self.current_pic_rate) ,throttle_duration_sec=5)
+
         
             goal_handle.publish_feedback(feedback_msg)
             

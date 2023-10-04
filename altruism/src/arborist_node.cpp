@@ -25,6 +25,8 @@
 
 #include "altruism/system_attribute_value.hpp"
 #include "altruism/bandit_action_node.h"
+#include "altruism/reactive_action_node.h"
+#include "altruism/random_action_node.h"
 #include "altruism/slam_action_node.h"
 #include "altruism/identify_action_node.h"
 
@@ -39,8 +41,6 @@
 using namespace BT;
 using std::placeholders::_1;
 using std::placeholders::_2;
-
-
 
 
 class Arborist : public rclcpp::Node
@@ -95,15 +95,19 @@ public:
 
       //I suppose here you register all the possible custom nodes, and the determination as to whether they are actually used lies in the xml tree provided.
       registerActionClient<BanditAction>(factory, "bt_bandit_client", "bandit", "Bandit");
+      registerActionClient<ReactiveAction>(factory, "bt_reactive_client", "reactive", "Reactive");
+      registerActionClient<RandomAction>(factory, "bt_random_client", "random", "Random");
+
       registerActionClient<SLAMAction>(factory, "bt_slam_client", "slam", "SLAMfd");
       registerActionClient<IdentifyAction>(factory, "bt_identify_client", "identify", "IDfd");
+      
       factory.registerNodeType<MissionCompleteNFR>("MissionNFR");
       factory.registerNodeType<EnergyNFR>("EnergyNFR");
 
 
 
 
-      this->declare_parameter(BT_NAME_PARAM, "onlyIDBandit.xml");
+      this->declare_parameter(BT_NAME_PARAM, "onlyID.xml");
       this->declare_parameter(EXP_NAME_PARAM, "no_experiment_name");
 
       bt_name = this->get_parameter(BT_NAME_PARAM).as_string();
@@ -113,10 +117,10 @@ public:
 
       tree = factory.createTreeFromFile(tree_dir + bt_name);
 
-      this->declare_parameter(MSN_MAX_OBJ_PS_NAME, 1.0);
-      this->declare_parameter(ENG_MAX_PIC_PS_NAME, 1.0);
-      this->declare_parameter(MSN_WINDOW_LEN_NAME, 20);
-      this->declare_parameter(ENG_WINDOW_LEN_NAME, 20);
+      this->declare_parameter(MSN_MAX_OBJ_PS_NAME, 0.14);
+      this->declare_parameter(ENG_MAX_PIC_PS_NAME, 0.4);
+      this->declare_parameter(MSN_WINDOW_LEN_NAME, 8);
+      this->declare_parameter(ENG_WINDOW_LEN_NAME, 8);
       
       
 
@@ -204,6 +208,8 @@ private:
     auto sys_attvalue_obj = altruism::SystemAttributeValue(sys_attr.value);
     tree.rootBlackboard()->set<altruism::SystemAttributeValue>(sys_attr.name, sys_attvalue_obj);
     
+    response->success = true;
+
 
     //Call template func here
   }
@@ -326,6 +332,7 @@ private:
     auto var_nodes = get_tree_variable_acs();
     for (auto & node : var_nodes) 
     {
+
       if(node->status() == NodeStatus::RUNNING) //ensures that the actions are currently in effect.
       {
       auto node_config = node->config();
@@ -343,12 +350,17 @@ private:
       auto var_bb_value = tree.rootBlackboard()->get<VariableParameters>((std::string)TreeNode::stripBlackboardPointer(var_params->second));
       //Each variable action node can provide one or more changeable parameters.
 
-      for (auto var_param : var_bb_value.variable_parameters)
-      {
-        response->variables_in_tree.variable_parameters.push_back(var_param); //We put all of these parameters that may change into a singular list. 
-        //Potentially we may want a list of these lists to keep them distinct.. 
+
+      // for (auto var_param : var_bb_value.variable_parameters)
+      // {
+      //   var_params_msg.variable_parameters.push_back(var_param);
+
+      // }
+      response->variables_in_tree.push_back(var_bb_value);
+
+
       }
-      }
+
     }
   }
 
@@ -453,6 +465,8 @@ private:
           float avg_energy_metric = tree.rootBlackboard()->get<float>("energy_mean_metric");
 
           int32_t id_det_threshold = tree.rootBlackboard()->get<int32_t>("id_det_threshold");
+          auto average_utility = tree.rootBlackboard()->get<std::string>("average_utility");
+
 
           
           auto curr_time_pointer = std::chrono::system_clock::now();
@@ -477,7 +491,9 @@ private:
               << id_time_elapsed << ", "
               << id_det_threshold << ", "
               << experiment_name << ", "
-              << bt_name << "\n";
+              << bt_name << ", "
+              << average_utility << "\n";
+
             
           fout.close();
 

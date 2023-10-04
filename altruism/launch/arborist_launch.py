@@ -17,14 +17,26 @@ def generate_launch_description():
         description='Name to give to the experiment in the CSV reporting afterwards.'
     )
     experiment_name = LaunchConfiguration('experiment_name')
+
+    tree_name_arg = DeclareLaunchArgument(
+    'tree_name',
+    default_value='none',
+    description='Name of behavior tree xml file'
+    )
+    tree_name = LaunchConfiguration('tree_name')
+
+
+
     return LaunchDescription([
         experiment_name_arg,
+        tree_name_arg,
         Node(
             package='altruism',
             executable='arborist',
             name='arborist_node',
             parameters=[config_file,{
-                'experiment_name': experiment_name
+                'experiment_name': experiment_name,
+                'bt_filename': tree_name
             }]
         ),
     ])

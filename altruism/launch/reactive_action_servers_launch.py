@@ -19,12 +19,6 @@ def generate_launch_description():
         ),
         Node(
             package='altruism',
-            executable='bandit_action_server.py',
-            name='bandit_action_server',
-            parameters=[config_file,{}]
-        ),
-        Node(
-            package='altruism',
             executable='ID_action_server.py',
             name='identify_action_server',
             parameters=[config_file,{}]
@@ -33,12 +27,6 @@ def generate_launch_description():
             package='altruism',
             executable='reactive_action_server.py',
             name='reactive_action_server',
-            parameters=[config_file,{}]
-        ),
-        Node(
-            package='altruism',
-            executable='random_action_server.py',
-            name='random_action_server',
             parameters=[config_file,{}]
         ),
     ])

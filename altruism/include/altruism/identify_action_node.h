@@ -13,12 +13,11 @@
 #include "altruism_msgs/msg/objects_identified.hpp"
 #include "nav_msgs/srv/get_map.hpp"
 #include "altruism/variable_action_node.h"
-
+#include "rclcpp/parameter_value.hpp"
 using namespace BT;
 
 
 using ID = altruism_msgs::action::Identify;
-using VariableParam = altruism_msgs::msg::VariableParameter;
 
 
 class IdentifyAction: public VariableActionNode<ID>
@@ -29,6 +28,8 @@ public:
 
   
   const std::string PICTURE_RT_PARAM = "pic_rate";
+  const std::string ACTION_SRVR = "identify_action_server";
+
 
   IdentifyAction(const std::string& name,
                   const NodeConfig& conf,
@@ -37,35 +38,10 @@ public:
   {
     std::cout << "Someone made me (an ID Action Node) \n\n\n\n\n\n" << std::endl;
     
-    _var_params = VariableParameters();
+    _var_params.server_name = ACTION_SRVR;
 
-    VariableParam picture_rate_param = VariableParam();
-    VariableParam pret_param = VariableParam();
-
-
-    picture_rate_param.name = PICTURE_RT_PARAM;
-    int pc_rate_values[4] = {1,3,5,7};
-
-    for (int val : pc_rate_values) {
-      ParamValue possible_value = ParamValue();
-      possible_value.type = 2; //integer type
-      possible_value.integer_value = val;
-      picture_rate_param.possible_values.push_back(possible_value);
-    }
-
-    _var_params.variable_parameters.push_back(picture_rate_param); //vector of VariableParameter
-
-    // pret_param.name = "pretend_var";
-    // int pret_values[2] = {10,20};
-
-    // for (int val : pret_values) {
-    //   ParamValue possible_value = ParamValue();
-    //   possible_value.type = 2; //integer type
-    //   possible_value.integer_value = val;
-    //   pret_param.possible_values.push_back(possible_value);
-    // }
-
-    // _var_params.variable_parameters.push_back(pret_param); //vector of VariableParameter
+    std::vector<int> pc_rate_values{1, 3, 5, 7};
+    registerAdaptations<int>(pc_rate_values, PICTURE_RT_PARAM);
     
     setOutput(VARIABLE_PARAMS, _var_params);
 

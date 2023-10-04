@@ -29,16 +29,4 @@ def generate_launch_description():
             name='identify_action_server',
             parameters=[config_file,{}]
         ),
-        Node(
-            package='altruism',
-            executable='reactive_action_server.py',
-            name='reactive_action_server',
-            parameters=[config_file,{}]
-        ),
-        Node(
-            package='altruism',
-            executable='random_action_server.py',
-            name='random_action_server',
-            parameters=[config_file,{}]
-        ),
     ])

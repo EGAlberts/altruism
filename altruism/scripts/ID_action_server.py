@@ -107,8 +107,8 @@ class IdentifyActionServer(Node):
             callback_group=MutuallyExclusiveCallbackGroup())
         
         self.declare_parameter(GOAL_OBJ_NAME_PARAM, "fire hydrant")
-        self.declare_parameter(PICTURE_RT_PARAM, 5)
-        self.declare_parameter(DET_THRESH_PARAM,50)
+        self.declare_parameter(PICTURE_RT_PARAM, 1)
+        self.declare_parameter(DET_THRESH_PARAM,14)
         
 
         
@@ -288,7 +288,7 @@ class IdentifyActionServer(Node):
                 pt[1] = origin_x + ( (pt[1]*self.map.info.resolution) + (self.map.info.resolution/2))
                 pt[0] = origin_y + ( (pt[0]*self.map.info.resolution) + (self.map.info.resolution/2))
 
-                self.get_logger().info('pt[0]: {0} pt[1]: {1}  resolution {2}'.format(pt[0], pt[1], self.map.info.resolution))
+                # self.get_logger().info('pt[0]: {0} pt[1]: {1}  resolution {2}'.format(pt[0], pt[1], self.map.info.resolution))
 
         points_to_visit = []
 
